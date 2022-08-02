@@ -14,6 +14,7 @@
 
 """Run the BSON corpus specification tests."""
 
+
 import binascii
 import codecs
 import functools
@@ -24,7 +25,7 @@ import sys
 
 from decimal import DecimalException
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 from bson import decode, encode, json_util
 from bson.binary import STANDARD
@@ -242,7 +243,7 @@ def create_tests():
         test_suffix, _ = os.path.splitext(os.path.basename(filename))
         with codecs.open(filename, encoding='utf-8') as bson_test_file:
             test_method = create_test(json.load(bson_test_file))
-        setattr(TestBSONCorpus, 'test_' + test_suffix, test_method)
+        setattr(TestBSONCorpus, f'test_{test_suffix}', test_method)
 
 
 create_tests()

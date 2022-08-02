@@ -14,9 +14,10 @@
 
 """Test the bulk API."""
 
+
 import sys
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 from bson.objectid import ObjectId
 from pymongo.common import partition_node
@@ -307,8 +308,7 @@ class TestBulk(BulkTestBase):
             {'_id': 3, 'l': 's' * (_16_MB - 10000)},
         ]
         # Fill in the remaining ~10000 bytes with small documents.
-        for i in range(4, 10000):
-            docs.append({'_id': i})
+        docs.extend({'_id': i} for i in range(4, 10000))
         result = self.coll.insert_many(docs)
         self.assertEqual(len(docs), len(result.inserted_ids))
 
@@ -673,8 +673,7 @@ class TestBulkUnacknowledged(BulkTestBase):
         ]
         result = self.coll_w0.bulk_write(requests)
         self.assertFalse(result.acknowledged)
-        wait_until(lambda: 2 == self.coll.count_documents({}),
-                   'insert 2 documents')
+        wait_until(lambda: self.coll.count_documents({}) == 2, 'insert 2 documents')
         wait_until(lambda: self.coll.find_one({'_id': 1}) is None,
                    'removed {"_id": 1}')
 
@@ -690,8 +689,7 @@ class TestBulkUnacknowledged(BulkTestBase):
         ]
         result = self.coll_w0.bulk_write(requests)
         self.assertFalse(result.acknowledged)
-        wait_until(lambda: 3 == self.coll.count_documents({}),
-                   'insert 3 documents')
+        wait_until(lambda: self.coll.count_documents({}) == 3, 'insert 3 documents')
         self.assertEqual({'_id': 1}, self.coll.find_one({'_id': 1}))
 
     def test_no_results_unordered_success(self):
@@ -703,8 +701,7 @@ class TestBulkUnacknowledged(BulkTestBase):
         ]
         result = self.coll_w0.bulk_write(requests, ordered=False)
         self.assertFalse(result.acknowledged)
-        wait_until(lambda: 2 == self.coll.count_documents({}),
-                   'insert 2 documents')
+        wait_until(lambda: self.coll.count_documents({}) == 2, 'insert 2 documents')
         wait_until(lambda: self.coll.find_one({'_id': 1}) is None,
                    'removed {"_id": 1}')
 
@@ -720,8 +717,7 @@ class TestBulkUnacknowledged(BulkTestBase):
         ]
         result = self.coll_w0.bulk_write(requests, ordered=False)
         self.assertFalse(result.acknowledged)
-        wait_until(lambda: 2 == self.coll.count_documents({}),
-                   'insert 2 documents')
+        wait_until(lambda: self.coll.count_documents({}) == 2, 'insert 2 documents')
         wait_until(lambda: self.coll.find_one({'_id': 1}) is None,
                    'removed {"_id": 1}')
 
@@ -752,7 +748,7 @@ class TestBulkAuthorization(BulkAuthorizationTestBase):
             InsertOne({'x': 3}),  # Never attempted.
         ]
         self.assertRaises(OperationFailure, coll.bulk_write, requests)
-        self.assertEqual(set([1, 2]), set(self.coll.distinct('x')))
+        self.assertEqual({1, 2}, set(self.coll.distinct('x')))
 
 
 class TestBulkWriteConcern(BulkTestBase):

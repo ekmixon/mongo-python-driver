@@ -84,10 +84,7 @@ class _EncryptionIO(MongoCryptCallback):
     def __init__(self, client, key_vault_coll, mongocryptd_client, opts):
         """Internal class to perform I/O on behalf of pymongocrypt."""
         # Use a weak ref to break reference cycle.
-        if client is not None:
-            self.client_ref = weakref.ref(client)
-        else:
-            self.client_ref = None
+        self.client_ref = weakref.ref(client) if client is not None else None
         self.key_vault_coll = key_vault_coll.with_options(
             codec_options=_KEY_VAULT_OPTS,
             read_concern=ReadConcern(level='majority'),

@@ -448,7 +448,7 @@ def _json_convert(obj, json_options=DEFAULT_JSON_OPTIONS):
         return SON(((k, _json_convert(v, json_options))
                     for k, v in obj.items()))
     elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes)):
-        return list((_json_convert(v, json_options) for v in obj))
+        return [_json_convert(v, json_options) for v in obj]
     try:
         return default(obj, json_options)
     except TypeError:
@@ -500,9 +500,7 @@ def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):
         return _parse_canonical_symbol(dct)
     if "$numberInt" in dct:
         return _parse_canonical_int32(dct)
-    if "$numberDouble" in dct:
-        return _parse_canonical_double(dct)
-    return dct
+    return _parse_canonical_double(dct) if "$numberDouble" in dct else dct
 
 
 def _parse_legacy_regex(doc):
@@ -520,9 +518,9 @@ def _parse_legacy_regex(doc):
 def _parse_legacy_uuid(doc, json_options):
     """Decode a JSON legacy $uuid to Python UUID."""
     if len(doc) != 1:
-        raise TypeError('Bad $uuid, extra field(s): %s' % (doc,))
+        raise TypeError(f'Bad $uuid, extra field(s): {doc}')
     if not isinstance(doc["$uuid"], str):
-        raise TypeError('$uuid must be a string: %s' % (doc,))
+        raise TypeError(f'$uuid must be a string: {doc}')
     if json_options.uuid_representation == UuidRepresentation.UNSPECIFIED:
         return Binary.from_uuid(uuid.UUID(doc["$uuid"]))
     else:
@@ -531,23 +529,20 @@ def _parse_legacy_uuid(doc, json_options):
 
 def _binary_or_uuid(data, subtype, json_options):
     # special handling for UUID
-    if subtype in ALL_UUID_SUBTYPES:
-        uuid_representation = json_options.uuid_representation
-        binary_value = Binary(data, subtype)
-        if uuid_representation == UuidRepresentation.UNSPECIFIED:
-            return binary_value
-        if subtype == UUID_SUBTYPE:
-            # Legacy behavior: use STANDARD with binary subtype 4.
-            uuid_representation = UuidRepresentation.STANDARD
-        elif uuid_representation == UuidRepresentation.STANDARD:
-            # subtype == OLD_UUID_SUBTYPE
-            # Legacy behavior: STANDARD is the same as PYTHON_LEGACY.
-            uuid_representation = UuidRepresentation.PYTHON_LEGACY
-        return binary_value.as_uuid(uuid_representation)
-
-    if subtype == 0:
-        return data
-    return Binary(data, subtype)
+    if subtype not in ALL_UUID_SUBTYPES:
+        return data if subtype == 0 else Binary(data, subtype)
+    uuid_representation = json_options.uuid_representation
+    binary_value = Binary(data, subtype)
+    if uuid_representation == UuidRepresentation.UNSPECIFIED:
+        return binary_value
+    if subtype == UUID_SUBTYPE:
+        # Legacy behavior: use STANDARD with binary subtype 4.
+        uuid_representation = UuidRepresentation.STANDARD
+    elif uuid_representation == UuidRepresentation.STANDARD:
+        # subtype == OLD_UUID_SUBTYPE
+        # Legacy behavior: STANDARD is the same as PYTHON_LEGACY.
+        uuid_representation = UuidRepresentation.PYTHON_LEGACY
+    return binary_value.as_uuid(uuid_representation)
 
 
 def _parse_legacy_binary(doc, json_options):
@@ -565,7 +560,7 @@ def _parse_canonical_binary(doc, json_options):
     b64 = binary["base64"]
     subtype = binary["subType"]
     if not isinstance(b64, str):
-        raise TypeError('$binary base64 must be a string: %s' % (doc,))
+        raise TypeError(f'$binary base64 must be a string: {doc}')
     if not isinstance(subtype, str) or len(subtype) > 2:
         raise TypeError('$binary subType must be a string at most 2 '
                         'characters: %s' % (doc,))
@@ -581,7 +576,7 @@ def _parse_canonical_datetime(doc, json_options):
     """Decode a JSON datetime to python datetime.datetime."""
     dtm = doc["$date"]
     if len(doc) != 1:
-        raise TypeError('Bad $date, extra field(s): %s' % (doc,))
+        raise TypeError(f'Bad $date, extra field(s): {doc}')
     # mongoexport 2.6 and newer
     if isinstance(dtm, str):
         # Parse offset
@@ -627,19 +622,18 @@ def _parse_canonical_datetime(doc, json_options):
                 secs *= -1
             aware = aware - datetime.timedelta(seconds=secs)
 
-        if json_options.tz_aware:
-            if json_options.tzinfo:
-                aware = aware.astimezone(json_options.tzinfo)
-            return aware
-        else:
+        if not json_options.tz_aware:
             return aware.replace(tzinfo=None)
+        if json_options.tzinfo:
+            aware = aware.astimezone(json_options.tzinfo)
+        return aware
     return bson._millis_to_datetime(int(dtm), json_options)
 
 
 def _parse_canonical_oid(doc):
     """Decode a JSON ObjectId to bson.objectid.ObjectId."""
     if len(doc) != 1:
-        raise TypeError('Bad $oid, extra field(s): %s' % (doc,))
+        raise TypeError(f'Bad $oid, extra field(s): {doc}')
     return ObjectId(doc['$oid'])
 
 
@@ -647,7 +641,7 @@ def _parse_canonical_symbol(doc):
     """Decode a JSON symbol to Python string."""
     symbol = doc['$symbol']
     if len(doc) != 1:
-        raise TypeError('Bad $symbol, extra field(s): %s' % (doc,))
+        raise TypeError(f'Bad $symbol, extra field(s): {doc}')
     return str(symbol)
 
 
@@ -655,7 +649,7 @@ def _parse_canonical_code(doc):
     """Decode a JSON code to bson.code.Code."""
     for key in doc:
         if key not in ('$code', '$scope'):
-            raise TypeError('Bad $code, extra field(s): %s' % (doc,))
+            raise TypeError(f'Bad $code, extra field(s): {doc}')
     return Code(doc['$code'], scope=doc.get('$scope'))
 
 
@@ -663,7 +657,7 @@ def _parse_canonical_regex(doc):
     """Decode a JSON regex to bson.regex.Regex."""
     regex = doc['$regularExpression']
     if len(doc) != 1:
-        raise TypeError('Bad $regularExpression, extra field(s): %s' % (doc,))
+        raise TypeError(f'Bad $regularExpression, extra field(s): {doc}')
     if len(regex) != 2:
         raise TypeError('Bad $regularExpression must include only "pattern"'
                         'and "options" components: %s' % (doc,))
@@ -684,31 +678,27 @@ def _parse_canonical_dbpointer(doc):
     """Decode a JSON (deprecated) DBPointer to bson.dbref.DBRef."""
     dbref = doc['$dbPointer']
     if len(doc) != 1:
-        raise TypeError('Bad $dbPointer, extra field(s): %s' % (doc,))
-    if isinstance(dbref, DBRef):
-        dbref_doc = dbref.as_doc()
+        raise TypeError(f'Bad $dbPointer, extra field(s): {doc}')
+    if not isinstance(dbref, DBRef):
+        raise TypeError(f'Bad $dbPointer, expected a DBRef: {doc}')
+    dbref_doc = dbref.as_doc()
         # DBPointer must not contain $db in its value.
-        if dbref.database is not None:
-            raise TypeError(
-                'Bad $dbPointer, extra field $db: %s' % (dbref_doc,))
-        if not isinstance(dbref.id, ObjectId):
-            raise TypeError(
-                'Bad $dbPointer, $id must be an ObjectId: %s' % (dbref_doc,))
-        if len(dbref_doc) != 2:
-            raise TypeError(
-                'Bad $dbPointer, extra field(s) in DBRef: %s' % (dbref_doc,))
-        return dbref
-    else:
-        raise TypeError('Bad $dbPointer, expected a DBRef: %s' % (doc,))
+    if dbref.database is not None:
+        raise TypeError(f'Bad $dbPointer, extra field $db: {dbref_doc}')
+    if not isinstance(dbref.id, ObjectId):
+        raise TypeError(f'Bad $dbPointer, $id must be an ObjectId: {dbref_doc}')
+    if len(dbref_doc) != 2:
+        raise TypeError(f'Bad $dbPointer, extra field(s) in DBRef: {dbref_doc}')
+    return dbref
 
 
 def _parse_canonical_int32(doc):
     """Decode a JSON int32 to python int."""
     i_str = doc['$numberInt']
     if len(doc) != 1:
-        raise TypeError('Bad $numberInt, extra field(s): %s' % (doc,))
+        raise TypeError(f'Bad $numberInt, extra field(s): {doc}')
     if not isinstance(i_str, str):
-        raise TypeError('$numberInt must be string: %s' % (doc,))
+        raise TypeError(f'$numberInt must be string: {doc}')
     return int(i_str)
 
 
@@ -716,7 +706,7 @@ def _parse_canonical_int64(doc):
     """Decode a JSON int64 to bson.int64.Int64."""
     l_str = doc['$numberLong']
     if len(doc) != 1:
-        raise TypeError('Bad $numberLong, extra field(s): %s' % (doc,))
+        raise TypeError(f'Bad $numberLong, extra field(s): {doc}')
     return Int64(l_str)
 
 
@@ -724,9 +714,9 @@ def _parse_canonical_double(doc):
     """Decode a JSON double to python float."""
     d_str = doc['$numberDouble']
     if len(doc) != 1:
-        raise TypeError('Bad $numberDouble, extra field(s): %s' % (doc,))
+        raise TypeError(f'Bad $numberDouble, extra field(s): {doc}')
     if not isinstance(d_str, str):
-        raise TypeError('$numberDouble must be string: %s' % (doc,))
+        raise TypeError(f'$numberDouble must be string: {doc}')
     return float(d_str)
 
 
@@ -734,18 +724,18 @@ def _parse_canonical_decimal128(doc):
     """Decode a JSON decimal128 to bson.decimal128.Decimal128."""
     d_str = doc['$numberDecimal']
     if len(doc) != 1:
-        raise TypeError('Bad $numberDecimal, extra field(s): %s' % (doc,))
+        raise TypeError(f'Bad $numberDecimal, extra field(s): {doc}')
     if not isinstance(d_str, str):
-        raise TypeError('$numberDecimal must be string: %s' % (doc,))
+        raise TypeError(f'$numberDecimal must be string: {doc}')
     return Decimal128(d_str)
 
 
 def _parse_canonical_minkey(doc):
     """Decode a JSON MinKey to bson.min_key.MinKey."""
     if type(doc['$minKey']) is not int or doc['$minKey'] != 1:
-        raise TypeError('$minKey value must be 1: %s' % (doc,))
+        raise TypeError(f'$minKey value must be 1: {doc}')
     if len(doc) != 1:
-        raise TypeError('Bad $minKey, extra field(s): %s' % (doc,))
+        raise TypeError(f'Bad $minKey, extra field(s): {doc}')
     return MinKey()
 
 
@@ -754,7 +744,7 @@ def _parse_canonical_maxkey(doc):
     if type(doc['$maxKey']) is not int or doc['$maxKey'] != 1:
         raise TypeError('$maxKey value must be 1: %s', (doc,))
     if len(doc) != 1:
-        raise TypeError('Bad $minKey, extra field(s): %s' % (doc,))
+        raise TypeError(f'Bad $minKey, extra field(s): {doc}')
     return MaxKey()
 
 
@@ -788,8 +778,7 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
                     tz_string = obj.strftime('%z')
                 millis = int(obj.microsecond / 1000)
                 fracsecs = ".%03d" % (millis,) if millis else ""
-                return {"$date": "%s%s%s" % (
-                    obj.strftime("%Y-%m-%dT%H:%M:%S"), fracsecs, tz_string)}
+                return {"$date": f'{obj.strftime("%Y-%m-%dT%H:%M:%S")}{fracsecs}{tz_string}'}
 
         millis = bson._datetime_to_millis(obj)
         if (json_options.datetime_representation ==
@@ -837,12 +826,11 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
     if isinstance(obj, bytes):
         return _encode_binary(obj, 0, json_options)
     if isinstance(obj, uuid.UUID):
-        if json_options.strict_uuid:
-            binval = Binary.from_uuid(
-                obj, uuid_representation=json_options.uuid_representation)
-            return _encode_binary(binval, binval.subtype, json_options)
-        else:
+        if not json_options.strict_uuid:
             return {"$uuid": obj.hex}
+        binval = Binary.from_uuid(
+            obj, uuid_representation=json_options.uuid_representation)
+        return _encode_binary(binval, binval.subtype, json_options)
     if isinstance(obj, Decimal128):
         return {"$numberDecimal": str(obj)}
     if isinstance(obj, bool):
@@ -861,5 +849,5 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
         elif json_options.json_mode == JSONMode.CANONICAL:
             # repr() will return the shortest string guaranteed to produce the
             # original value, when float() is called on it.
-            return {'$numberDouble': str(repr(obj))}
+            return {'$numberDouble': repr(obj)}
     raise TypeError("%r is not JSON serializable" % obj)

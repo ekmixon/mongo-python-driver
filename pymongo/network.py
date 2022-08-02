@@ -81,7 +81,7 @@ def command(sock_info, dbname, spec, secondary_ok, is_mongos,
       - `exhaust_allowed`: True if we should enable OP_MSG exhaustAllowed.
     """
     name = next(iter(spec))
-    ns = dbname + '.$cmd'
+    ns = f'{dbname}.$cmd'
     flags = 4 if secondary_ok else 0
     speculative_hello = False
 
@@ -187,8 +187,7 @@ _UNPACK_COMPRESSION_HEADER = struct.Struct("<iiB").unpack
 
 def receive_message(sock_info, request_id, max_message_size=MAX_MESSAGE_SIZE):
     """Receive a raw BSON message or raise socket.error."""
-    timeout = sock_info.sock.gettimeout()
-    if timeout:
+    if timeout := sock_info.sock.gettimeout():
         deadline = time.monotonic() + timeout
     else:
         deadline = None
@@ -196,10 +195,9 @@ def receive_message(sock_info, request_id, max_message_size=MAX_MESSAGE_SIZE):
     length, _, response_to, op_code = _UNPACK_HEADER(
         _receive_data_on_socket(sock_info, 16, deadline))
     # No request_id for exhaust cursor "getMore".
-    if request_id is not None:
-        if request_id != response_to:
-            raise ProtocolError("Got response id %r but expected "
-                                "%r" % (response_to, request_id))
+    if request_id is not None and request_id != response_to:
+        raise ProtocolError("Got response id %r but expected "
+                            "%r" % (response_to, request_id))
     if length <= 16:
         raise ProtocolError("Message length (%r) not longer than standard "
                             "message header size (16)" % (length,))
@@ -228,29 +226,28 @@ _POLL_TIMEOUT = 0.5
 
 def wait_for_read(sock_info, deadline):
     """Block until at least one byte is read, or a timeout, or a cancel."""
-    context = sock_info.cancel_context
-    # Only Monitor connections can be cancelled.
-    if context:
-        sock = sock_info.sock
-        while True:
-            # SSLSocket can have buffered data which won't be caught by select.
-            if hasattr(sock, 'pending') and sock.pending() > 0:
-                readable = True
+    if not (context := sock_info.cancel_context):
+        return
+    sock = sock_info.sock
+    while True:
+        # SSLSocket can have buffered data which won't be caught by select.
+        if hasattr(sock, 'pending') and sock.pending() > 0:
+            readable = True
+        else:
+            # Wait up to 500ms for the socket to become readable and then
+            # check for cancellation.
+            if deadline:
+                timeout = max(min(deadline - time.monotonic(), _POLL_TIMEOUT), 0.001)
             else:
-                # Wait up to 500ms for the socket to become readable and then
-                # check for cancellation.
-                if deadline:
-                    timeout = max(min(deadline - time.monotonic(), _POLL_TIMEOUT), 0.001)
-                else:
-                    timeout = _POLL_TIMEOUT
-                readable = sock_info.socket_checker.select(
-                    sock, read=True, timeout=timeout)
-            if context.cancelled:
-                raise _OperationCancelled('hello cancelled')
-            if readable:
-                return
-            if deadline and time.monotonic() > deadline:
-                raise socket.timeout("timed out")
+                timeout = _POLL_TIMEOUT
+            readable = sock_info.socket_checker.select(
+                sock, read=True, timeout=timeout)
+        if context.cancelled:
+            raise _OperationCancelled('hello cancelled')
+        if readable:
+            return
+        if deadline and time.monotonic() > deadline:
+            raise socket.timeout("timed out")
 
 def _receive_data_on_socket(sock_info, length, deadline):
     buf = bytearray(length)

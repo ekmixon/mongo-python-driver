@@ -48,10 +48,8 @@ class SON(dict):
         return instance
 
     def __repr__(self):
-        result = []
-        for key in self.__keys:
-            result.append("(%r, %r)" % (key, self[key]))
-        return "SON([%s])" % ", ".join(result)
+        result = ["(%r, %r)" % (key, self[key]) for key in self.__keys]
+        return f'SON([{", ".join(result)}])'
 
     def __setitem__(self, key, value):
         if key not in self.__keys:
@@ -71,8 +69,7 @@ class SON(dict):
     # efficient.
     # second level definitions support higher levels
     def __iter__(self):
-        for k in self.__keys:
-            yield k
+        yield from self.__keys
 
     def has_key(self, key):
         return key in self.__keys
@@ -102,7 +99,7 @@ class SON(dict):
     def pop(self, key, *args):
         if len(args) > 1:
             raise TypeError("pop expected at most 2 arguments, got "\
-                                + repr(1 + len(args)))
+                                    + repr(1 + len(args)))
         try:
             value = self[key]
         except KeyError:
@@ -148,7 +145,7 @@ class SON(dict):
         """
         if isinstance(other, SON):
             return len(self) == len(other) and list(self.items()) == \
-                   list(other.items())
+                       list(other.items())
         return self.to_dict() == other
 
     def __ne__(self, other):

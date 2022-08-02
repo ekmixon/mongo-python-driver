@@ -14,9 +14,10 @@
 
 """Test compliance with the connections survive primary step down spec."""
 
+
 import sys
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 from bson import SON
 from pymongo import monitoring

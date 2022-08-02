@@ -162,8 +162,7 @@ class Hello(object):
 
     @property
     def me(self):
-        me = self._doc.get('me')
-        if me:
+        if me := self._doc.get('me'):
             return common.clean_node(me)
 
     @property

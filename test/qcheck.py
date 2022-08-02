@@ -18,7 +18,7 @@ import re
 import sys
 import traceback
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
@@ -121,13 +121,14 @@ def gen_regexp(gen_length):
     def gen_flags():
         flags = 0
         if random.random() > 0.5:
-            flags = flags | re.IGNORECASE
+            flags |= re.IGNORECASE
         if random.random() > 0.5:
             flags = flags | re.MULTILINE
         if random.random() > 0.5:
             flags = flags | re.VERBOSE
 
         return flags
+
     return lambda: re.compile(pattern(), gen_flags())
 
 
@@ -233,11 +234,12 @@ def check(predicate, generator):
 
 
 def check_unittest(test, predicate, generator):
-    counter_examples = check(predicate, generator)
-    if counter_examples:
+    if counter_examples := check(predicate, generator):
         failures = len(counter_examples)
-        message = "\n".join(["    -> %s" % f for f in
-                             counter_examples[:examples]])
+        message = "\n".join(
+            [f"    -> {f}" for f in counter_examples[:examples]]
+        )
+
         message = ("found %d counter examples, displaying first %d:\n%s" %
                    (failures, min(failures, examples), message))
         test.fail(message)

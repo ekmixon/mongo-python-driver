@@ -169,14 +169,12 @@ def _shutdown_executors():
 
     # First signal all executors to close...
     for ref in executors:
-        executor = ref()
-        if executor:
+        if executor := ref():
             executor.close()
 
     # ...then try to join them.
     for ref in executors:
-        executor = ref()
-        if executor:
+        if executor := ref():
             executor.join(1)
 
     executor = None

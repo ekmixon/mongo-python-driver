@@ -461,9 +461,7 @@ def gen_list_name():
     The first 1000 keys are returned from a pre-built cache. All
     subsequent keys are generated on the fly.
     """
-    for name in _LIST_NAMES:
-        yield name
-
+    yield from _LIST_NAMES
     counter = itertools.count(1000)
     while True:
         yield (str(next(counter)) + "\x00").encode('utf8')
@@ -481,24 +479,23 @@ def _make_c_string_check(string):
         except UnicodeError:
             raise InvalidStringData("strings in documents must be valid "
                                     "UTF-8: %r" % string)
+    elif "\x00" in string:
+        raise InvalidDocument("BSON keys / regex patterns must not "
+                              "contain a NUL character")
     else:
-        if "\x00" in string:
-            raise InvalidDocument("BSON keys / regex patterns must not "
-                                  "contain a NUL character")
         return _utf_8_encode(string)[0] + b"\x00"
 
 
 def _make_c_string(string):
     """Make a 'C' string."""
-    if isinstance(string, bytes):
-        try:
-            _utf_8_decode(string, None, True)
-            return string + b"\x00"
-        except UnicodeError:
-            raise InvalidStringData("strings in documents must be valid "
-                                    "UTF-8: %r" % string)
-    else:
+    if not isinstance(string, bytes):
         return _utf_8_encode(string)[0] + b"\x00"
+    try:
+        _utf_8_decode(string, None, True)
+        return string + b"\x00"
+    except UnicodeError:
+        raise InvalidStringData("strings in documents must be valid "
+                                "UTF-8: %r" % string)
 
 
 def _make_name(string):
@@ -641,11 +638,10 @@ def _encode_int(name, value, dummy0, dummy1):
     """Encode a python int."""
     if -2147483648 <= value <= 2147483647:
         return b"\x10" + name + _PACK_INT(value)
-    else:
-        try:
-            return b"\x12" + name + _PACK_LONG(value)
-        except struct.error:
-            raise OverflowError("BSON can only handle up to 8-byte ints")
+    try:
+        return b"\x12" + name + _PACK_LONG(value)
+    except struct.error:
+        raise OverflowError("BSON can only handle up to 8-byte ints")
 
 
 def _encode_timestamp(name, value, dummy0, dummy1):
@@ -723,7 +719,7 @@ _MARKERS = {
 }
 
 
-_BUILT_IN_TYPES = tuple(t for t in _ENCODERS)
+_BUILT_IN_TYPES = tuple(_ENCODERS)
 
 
 def _name_value_to_bson(name, value, check_keys, opts,
@@ -803,10 +799,12 @@ def _dict_to_bson(doc, check_keys, opts, top_level=True):
         if top_level and "_id" in doc:
             elements.append(_name_value_to_bson(b"_id\x00", doc["_id"],
                                                 check_keys, opts))
-        for key, value in doc.items():
-            if not top_level or key != "_id":
-                elements.append(_element_to_bson(key, value,
-                                                 check_keys, opts))
+        elements.extend(
+            _element_to_bson(key, value, check_keys, opts)
+            for key, value in doc.items()
+            if not top_level or key != "_id"
+        )
+
     except AttributeError:
         raise TypeError("encoder expected a mapping type but got: %r" % (doc,))
 
@@ -821,15 +819,14 @@ def _millis_to_datetime(millis, opts):
     diff = ((millis % 1000) + 1000) % 1000
     seconds = (millis - diff) // 1000
     micros = diff * 1000
-    if opts.tz_aware:
-        dt = EPOCH_AWARE + datetime.timedelta(seconds=seconds,
-                                              microseconds=micros)
-        if opts.tzinfo:
-            dt = dt.astimezone(opts.tzinfo)
-        return dt
-    else:
+    if not opts.tz_aware:
         return EPOCH_NAIVE + datetime.timedelta(seconds=seconds,
                                                 microseconds=micros)
+    dt = EPOCH_AWARE + datetime.timedelta(seconds=seconds,
+                                          microseconds=micros)
+    if opts.tzinfo:
+        dt = dt.astimezone(opts.tzinfo)
+    return dt
 
 
 def _datetime_to_millis(dtm):
@@ -987,11 +984,9 @@ def _decode_selective(rawdoc, fields, codec_options):
 
 
 def _convert_raw_document_lists_to_streams(document):
-    cursor = document.get('cursor')
-    if cursor:
+    if cursor := document.get('cursor'):
         for key in ('firstBatch', 'nextBatch'):
-            batch = cursor.get(key)
-            if batch:
+            if batch := cursor.get(key):
                 stream = b"".join(doc.raw for doc in batch)
                 cursor[key] = [stream]
 

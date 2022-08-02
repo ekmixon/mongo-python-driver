@@ -16,6 +16,7 @@
 
 """Test the collection module."""
 
+
 import contextlib
 import re
 import sys
@@ -23,7 +24,7 @@ import sys
 from codecs import utf_8_decode
 from collections import defaultdict
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 from bson import encode
 from bson.raw_bson import RawBSONDocument
@@ -632,16 +633,13 @@ class TestCollection(IntegrationTest):
         doc = next(db.test.find({}, ["_id"]))
         self.assertEqual(list(doc), ["_id"])
         doc = next(db.test.find({}, ["a"]))
-        l = list(doc)
-        l.sort()
+        l = sorted(doc)
         self.assertEqual(l, ["_id", "a"])
         doc = next(db.test.find({}, ["b"]))
-        l = list(doc)
-        l.sort()
+        l = sorted(doc)
         self.assertEqual(l, ["_id", "b"])
         doc = next(db.test.find({}, ["c"]))
-        l = list(doc)
-        l.sort()
+        l = sorted(doc)
         self.assertEqual(l, ["_id", "c"])
         doc = next(db.test.find({}, ["a"]))
         self.assertEqual(doc["a"], 1)
@@ -659,16 +657,14 @@ class TestCollection(IntegrationTest):
         self.assertEqual(doc["c"], {"e": 10})
 
         doc = next(db.test.find({}, ["b", "c.e"]))
-        l = list(doc)
-        l.sort()
+        l = sorted(doc)
         self.assertEqual(l, ["_id", "b", "c"])
         doc = next(db.test.find({}, ["b", "c.e"]))
         self.assertEqual(doc["b"], 5)
 
         # Test field exclusion
         doc = next(db.test.find({}, {"a": False, "b": 0}))
-        l = list(doc)
-        l.sort()
+        l = sorted(doc)
         self.assertEqual(l, ["_id", "c"])
 
         doc = next(db.test.find({}, {"_id": False}))
@@ -715,8 +711,10 @@ class TestCollection(IntegrationTest):
         self.assertEqual(document["_id"], result.inserted_id)
         self.assertFalse(result.acknowledged)
         # The insert failed duplicate key...
-        wait_until(lambda: 2 == db.test.count_documents({}),
-                   'forcing duplicate key error')
+        wait_until(
+            lambda: db.test.count_documents({}) == 2, 'forcing duplicate key error'
+        )
+
 
         document = RawBSONDocument(
             encode({'_id': ObjectId(), 'foo': 'bar'}))
@@ -825,7 +823,7 @@ class TestCollection(IntegrationTest):
         self.assertTrue(isinstance(result, DeleteResult))
         self.assertRaises(InvalidOperation, lambda: result.deleted_count)
         self.assertFalse(result.acknowledged)
-        wait_until(lambda: 0 == db.test.count_documents({}), 'delete 1 documents')
+        wait_until(lambda: db.test.count_documents({}) == 0, 'delete 1 documents')
 
     def test_delete_many(self):
         self.db.test.drop()
@@ -847,8 +845,7 @@ class TestCollection(IntegrationTest):
         self.assertTrue(isinstance(result, DeleteResult))
         self.assertRaises(InvalidOperation, lambda: result.deleted_count)
         self.assertFalse(result.acknowledged)
-        wait_until(
-            lambda: 0 == db.test.count_documents({}), 'delete 2 documents')
+        wait_until(lambda: db.test.count_documents({}) == 0, 'delete 2 documents')
 
     def test_command_document_too_large(self):
         large = '*' * (client_context.max_bson_size + _COMMAND_OVERHEAD)
@@ -1595,9 +1592,6 @@ class TestCollection(IntegrationTest):
         next(cursor)
         # batchSize - 1
         self.assertEqual(4, len(cursor._CommandCursor__data))
-        # Exhaust the cursor. There shouldn't be any errors.
-        for doc in cursor:
-            pass
 
     def test_aggregation_cursor_alive(self):
         self.db.test.delete_many({})
@@ -1608,7 +1602,7 @@ class TestCollection(IntegrationTest):
         while True:
             cursor.next()
             n += 1
-            if 3 == n:
+            if n == 3:
                 self.assertFalse(cursor.alive)
                 break
 
@@ -1639,10 +1633,7 @@ class TestCollection(IntegrationTest):
 
         self.assertEqual(10, db.test.count_documents({}))
 
-        total = 0
-        for x in db.test.find({}, skip=4, limit=2):
-            total += x["x"]
-
+        total = sum(x["x"] for x in db.test.find({}, skip=4, limit=2))
         self.assertEqual(9, total)
 
     def test_rename(self):
@@ -1669,11 +1660,8 @@ class TestCollection(IntegrationTest):
         self.assertEqual(0, db.test.count_documents({}))
         self.assertEqual(10, db.foo.count_documents({}))
 
-        x = 0
-        for doc in db.foo.find():
+        for x, doc in enumerate(db.foo.find()):
             self.assertEqual(x, doc["x"])
-            x += 1
-
         db.test.insert_one({})
         self.assertRaises(OperationFailure, db.foo.rename, "test")
         db.foo.rename("test", dropTarget=True)
@@ -1700,8 +1688,8 @@ class TestCollection(IntegrationTest):
         self.assertTrue("hello" in db.test.find_one(projection=("hello",)))
         self.assertTrue("hello" not in db.test.find_one(projection=("foo",)))
 
-        self.assertTrue("hello" in db.test.find_one(projection=set(["hello"])))
-        self.assertTrue("hello" not in db.test.find_one(projection=set(["foo"])))
+        self.assertTrue("hello" in db.test.find_one(projection={"hello"}))
+        self.assertTrue("hello" not in db.test.find_one(projection={"foo"}))
 
         self.assertTrue("hello" in db.test.find_one(projection=frozenset(["hello"])))
         self.assertTrue("hello" not in db.test.find_one(projection=frozenset(["foo"])))
@@ -1790,8 +1778,6 @@ class TestCollection(IntegrationTest):
         cur = client[self.db.name].test.find(cursor_type=CursorType.EXHAUST)
         next(cur)
         self.assertEqual(0, len(pool.sockets))
-        for _ in cur:
-            pass
         self.assertEqual(1, len(pool.sockets))
 
         # Same as previous but don't call next()
@@ -1916,8 +1902,12 @@ class TestCollection(IntegrationTest):
         unack_coll = db.collection_2.with_options(
             write_concern=WriteConcern(w=0))
         unack_coll.insert_many(insert_second_fails)
-        wait_until(lambda: 1 == db.collection_2.count_documents({}),
-                   'insert 1 document', timeout=60)
+        wait_until(
+            lambda: db.collection_2.count_documents({}) == 1,
+            'insert 1 document',
+            timeout=60,
+        )
+
 
         db.collection_2.drop()
 
@@ -1944,8 +1934,12 @@ class TestCollection(IntegrationTest):
         unack_coll.insert_many(insert_two_failures, ordered=False)
 
         # Only the first and third documents are inserted.
-        wait_until(lambda: 2 == db.collection_4.count_documents({}),
-                   'insert 2 documents', timeout=60)
+        wait_until(
+            lambda: db.collection_4.count_documents({}) == 2,
+            'insert 2 documents',
+            timeout=60,
+        )
+
 
         db.collection_4.drop()
 

@@ -293,10 +293,7 @@ class Decimal128(object):
 
     def __str__(self):
         dec = self.to_decimal()
-        if dec.is_nan():
-            # Required by the drivers spec to match MongoDB behavior.
-            return "NaN"
-        return str(dec)
+        return "NaN" if dec.is_nan() else str(dec)
 
     def __repr__(self):
         return "Decimal128('%s')" % (str(self),)

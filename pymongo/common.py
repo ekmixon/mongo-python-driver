@@ -141,7 +141,7 @@ def clean_node(node):
 
 def raise_config_error(key, dummy):
     """Raise ConfigurationError with the given key name."""
-    raise ConfigurationError("Unknown option %s" % (key,))
+    raise ConfigurationError(f"Unknown option {key}")
 
 
 # Mapping of URI uuid representation options to valid subtypes.
@@ -158,7 +158,7 @@ def validate_boolean(option, value):
     """Validates that 'value' is True or False."""
     if isinstance(value, bool):
         return value
-    raise TypeError("%s must be True or False" % (option,))
+    raise TypeError(f"{option} must be True or False")
 
 
 def validate_boolean_or_string(option, value):
@@ -182,7 +182,7 @@ def validate_integer(option, value):
         except ValueError:
             raise ValueError("The value of %s must be "
                              "an integer" % (option,))
-    raise TypeError("Wrong type for %s, value must be an integer" % (option,))
+    raise TypeError(f"Wrong type for {option}, value must be an integer")
 
 
 def validate_positive_integer(option, value):
@@ -220,17 +220,13 @@ def validate_readable(option, value):
 def validate_positive_integer_or_none(option, value):
     """Validate that 'value' is a positive integer or None.
     """
-    if value is None:
-        return value
-    return validate_positive_integer(option, value)
+    return value if value is None else validate_positive_integer(option, value)
 
 
 def validate_non_negative_integer_or_none(option, value):
     """Validate that 'value' is a positive integer or 0 or None.
     """
-    if value is None:
-        return value
-    return validate_non_negative_integer(option, value)
+    return value if value is None else validate_non_negative_integer(option, value)
 
 
 def validate_string(option, value):
@@ -245,9 +241,7 @@ def validate_string(option, value):
 def validate_string_or_none(option, value):
     """Validates that 'value' is an instance of `basestring` or `None`.
     """
-    if value is None:
-        return value
-    return validate_string(option, value)
+    return value if value is None else validate_string(option, value)
 
 
 def validate_int_or_basestring(option, value):
@@ -283,7 +277,7 @@ def validate_positive_float(option, value):
     """Validates that 'value' is a float, or can be converted to one, and is
        positive.
     """
-    errmsg = "%s must be an integer or float" % (option,)
+    errmsg = f"{option} must be an integer or float"
     try:
         value = float(value)
     except ValueError:
@@ -303,9 +297,7 @@ def validate_positive_float_or_zero(option, value):
     """Validates that 'value' is 0 or a positive float, or can be converted to
     0 or a positive float.
     """
-    if value == 0 or value == "0":
-        return 0
-    return validate_positive_float(option, value)
+    return 0 if value in [0, "0"] else validate_positive_float(option, value)
 
 
 def validate_timeout_or_none(option, value):
@@ -324,8 +316,8 @@ def validate_timeout_or_zero(option, value):
     config error.
     """
     if value is None:
-        raise ConfigurationError("%s cannot be None" % (option, ))
-    if value == 0 or value == "0":
+        raise ConfigurationError(f"{option} cannot be None")
+    if value in [0, "0"]:
         return 0
     return validate_positive_float(option, value) / 1000.0
 
@@ -342,10 +334,7 @@ def validate_timeout_or_none_or_zero(option, value):
 
 def validate_max_staleness(option, value):
     """Validates maxStalenessSeconds according to the Max Staleness Spec."""
-    if value == -1 or value == "-1":
-        # Default: No maximum staleness.
-        return -1
-    return validate_positive_integer(option, value)
+    return -1 if value in [-1, "-1"] else validate_positive_integer(option, value)
 
 
 def validate_read_preference(dummy, value):
@@ -364,7 +353,7 @@ def validate_read_preference_mode(dummy, value):
        mode.
     """
     if value not in _MONGOS_MODES:
-        raise ValueError("%s is not a valid read preference" % (value,))
+        raise ValueError(f"{value} is not a valid read preference")
     return value
 
 
@@ -372,7 +361,7 @@ def validate_auth_mechanism(option, value):
     """Validate the authMechanism URI option.
     """
     if value not in MECHANISMS:
-        raise ValueError("%s must be in %s" % (option, tuple(MECHANISMS)))
+        raise ValueError(f"{option} must be in {tuple(MECHANISMS)}")
     return value
 
 
@@ -455,23 +444,20 @@ def validate_document_class(option, value):
 def validate_type_registry(option, value):
     """Validate the type_registry option."""
     if value is not None and not isinstance(value, TypeRegistry):
-        raise TypeError("%s must be an instance of %s" % (
-            option, TypeRegistry))
+        raise TypeError(f"{option} must be an instance of {TypeRegistry}")
     return value
 
 
 def validate_list(option, value):
     """Validates that 'value' is a list."""
     if not isinstance(value, list):
-        raise TypeError("%s must be a list" % (option,))
+        raise TypeError(f"{option} must be a list")
     return value
 
 
 def validate_list_or_none(option, value):
     """Validates that 'value' is a list or None."""
-    if value is None:
-        return value
-    return validate_list(option, value)
+    return value if value is None else validate_list(option, value)
 
 
 def validate_list_or_mapping(option, value):
@@ -506,7 +492,7 @@ def validate_appname_or_none(option, value):
     validate_string(option, value)
     # We need length in bytes, so encode utf8 first.
     if len(value.encode('utf-8')) > 128:
-        raise ValueError("%s must be <= 128 bytes" % (option,))
+        raise ValueError(f"{option} must be <= 128 bytes")
     return value
 
 
@@ -515,7 +501,7 @@ def validate_driver_or_none(option, value):
     if value is None:
         return value
     if not isinstance(value, DriverInfo):
-        raise TypeError("%s must be an instance of DriverInfo" % (option,))
+        raise TypeError(f"{option} must be an instance of DriverInfo")
     return value
 
 
@@ -524,7 +510,7 @@ def validate_server_api_or_none(option, value):
     if value is None:
         return value
     if not isinstance(value, ServerApi):
-        raise TypeError("%s must be an instance of ServerApi" % (option,))
+        raise TypeError(f"{option} must be an instance of ServerApi")
     return value
 
 
@@ -533,7 +519,7 @@ def validate_is_callable_or_none(option, value):
     if value is None:
         return value
     if not callable(value):
-        raise ValueError("%s must be a callable" % (option,))
+        raise ValueError(f"{option} must be a callable")
     return value
 
 
@@ -577,7 +563,7 @@ def validate_tzinfo(dummy, value):
     """Validate the tzinfo option
     """
     if value is not None and not isinstance(value, datetime.tzinfo):
-        raise TypeError("%s must be an instance of datetime.tzinfo" % value)
+        raise TypeError(f"{value} must be an instance of datetime.tzinfo")
     return value
 
 
@@ -587,8 +573,7 @@ def validate_auto_encryption_opts_or_none(option, value):
         return value
     from pymongo.encryption_options import AutoEncryptionOpts
     if not isinstance(value, AutoEncryptionOpts):
-        raise TypeError("%s must be an instance of AutoEncryptionOpts" % (
-            option,))
+        raise TypeError(f"{option} must be an instance of AutoEncryptionOpts")
 
     return value
 
@@ -695,17 +680,14 @@ URI_OPTIONS_DEPRECATION_MAP = {
 }
 
 # Augment the option validator map with pymongo-specific option information.
-URI_OPTIONS_VALIDATOR_MAP.update(NONSPEC_OPTIONS_VALIDATOR_MAP)
+URI_OPTIONS_VALIDATOR_MAP |= NONSPEC_OPTIONS_VALIDATOR_MAP
 for optname, aliases in URI_OPTIONS_ALIAS_MAP.items():
     for alias in aliases:
         if alias not in URI_OPTIONS_VALIDATOR_MAP:
             URI_OPTIONS_VALIDATOR_MAP[alias] = (
                 URI_OPTIONS_VALIDATOR_MAP[optname])
 
-# Map containing all URI option and keyword argument validators.
-VALIDATORS = URI_OPTIONS_VALIDATOR_MAP.copy()
-VALIDATORS.update(KW_VALIDATORS)
-
+VALIDATORS = URI_OPTIONS_VALIDATOR_MAP | KW_VALIDATORS
 # List of timeout-related options.
 TIMEOUT_OPTIONS = [
     'connecttimeoutms',
@@ -882,7 +864,7 @@ class _CaseInsensitiveDictionary(abc.MutableMapping):
         return len(self.__data)
 
     def __iter__(self):
-        return (key for key in self.__casedkeys)
+        return iter(self.__casedkeys)
 
     def __repr__(self):
         return str({self.__casedkeys[k]: self.__data[k] for k in self})
@@ -905,11 +887,7 @@ class _CaseInsensitiveDictionary(abc.MutableMapping):
             return NotImplemented
         if len(self) != len(other):
             return False
-        for key in other:
-            if self[key] != other[key]:
-                return False
-
-        return True
+        return all(self[key] == other[key] for key in other)
 
     def get(self, key, default=None):
         return self.__data.get(key.lower(), default)
@@ -932,10 +910,9 @@ class _CaseInsensitiveDictionary(abc.MutableMapping):
         lc_key = key.lower()
         if key in self:
             return self.__data[lc_key]
-        else:
-            self.__casedkeys[lc_key] = key
-            self.__data[lc_key] = default
-            return default
+        self.__casedkeys[lc_key] = key
+        self.__data[lc_key] = default
+        return default
 
     def update(self, other):
         if isinstance(other, _CaseInsensitiveDictionary):

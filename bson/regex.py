@@ -75,8 +75,9 @@ class Regex(object):
         """
         if not isinstance(regex, RE_TYPE):
             raise TypeError(
-                "regex must be a compiled regular expression, not %s"
-                % type(regex))
+                f"regex must be a compiled regular expression, not {type(regex)}"
+            )
+
 
         return Regex(regex.pattern, regex.flags)
 
@@ -92,7 +93,7 @@ class Regex(object):
             characters like "im" for IGNORECASE and MULTILINE
         """
         if not isinstance(pattern, (str, bytes)):
-            raise TypeError("pattern must be a string, not %s" % type(pattern))
+            raise TypeError(f"pattern must be a string, not {type(pattern)}")
         self.pattern = pattern
 
         if isinstance(flags, str):
@@ -100,8 +101,7 @@ class Regex(object):
         elif isinstance(flags, int):
             self.flags = flags
         else:
-            raise TypeError(
-                "flags must be a string or int, not %s" % type(flags))
+            raise TypeError(f"flags must be a string or int, not {type(flags)}")
 
     def __eq__(self, other):
         if isinstance(other, Regex):

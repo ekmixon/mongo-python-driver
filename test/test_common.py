@@ -14,10 +14,11 @@
 
 """Test the pymongo common module."""
 
+
 import sys
 import uuid
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 from bson.binary import Binary, PYTHON_LEGACY, STANDARD, UuidRepresentation
 from bson.codec_options import CodecOptions
@@ -149,21 +150,27 @@ class TestCommon(IntegrationTest):
         self.assertTrue(new_coll.insert_one(doc))
         self.assertRaises(OperationFailure, coll.insert_one, doc)
 
-        m = rs_or_single_client("mongodb://%s/" % (pair,),
-                                replicaSet=client_context.replica_set_name)
+        m = rs_or_single_client(
+            f"mongodb://{pair}/", replicaSet=client_context.replica_set_name
+        )
+
 
         coll = m.pymongo_test.write_concern_test
         self.assertRaises(OperationFailure, coll.insert_one, doc)
-        m = rs_or_single_client("mongodb://%s/?w=0" % (pair,),
-                                replicaSet=client_context.replica_set_name)
+        m = rs_or_single_client(
+            f"mongodb://{pair}/?w=0", replicaSet=client_context.replica_set_name
+        )
+
 
         coll = m.pymongo_test.write_concern_test
         coll.insert_one(doc)
 
         # Equality tests
         direct = connected(single_client(w=0))
-        direct2 = connected(single_client("mongodb://%s/?w=0" % (pair,),
-                                          **self.credentials))
+        direct2 = connected(
+            single_client(f"mongodb://{pair}/?w=0", **self.credentials)
+        )
+
         self.assertEqual(direct, direct2)
         self.assertFalse(direct != direct2)
 

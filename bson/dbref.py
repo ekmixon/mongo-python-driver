@@ -54,7 +54,7 @@ class DBRef(object):
         self.__collection = collection
         self.__id = id
         self.__database = database
-        kwargs.update(_extra)
+        kwargs |= _extra
         self.__kwargs = kwargs
 
     @property

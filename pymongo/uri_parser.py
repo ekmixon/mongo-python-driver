@@ -125,8 +125,7 @@ def parse_host(entity, default_port=DEFAULT_PORT):
         host, port = host.split(':', 1)
     if isinstance(port, str):
         if not port.isdigit() or int(port) > 65535 or int(port) <= 0:
-            raise ValueError("Port must be an integer between 0 and 65535: %s"
-                             % (port,))
+            raise ValueError(f"Port must be an integer between 0 and 65535: {port}")
         port = int(port)
 
     # Normalize hostname to lowercase, since DNS is case-insensitive:
@@ -208,9 +207,8 @@ def _handle_security_options(options):
         def truth_value(val):
             if val in ('true', 'false'):
                 return val == 'true'
-            if isinstance(val, bool):
-                return val
-            return val
+            return val if isinstance(val, bool) else val
+
         if truth_value(options.get('ssl')) != truth_value(options.get('tls')):
             err_msg = ("Can not specify conflicting values for URI options %s "
                        "and %s.")
@@ -521,8 +519,7 @@ def parse_uri(uri, default_port=DEFAULT_PORT, validate=True, warn=False,
                 "and only one, hostname" % (SRV_SCHEME,))
         fqdn, port = nodes[0]
         if port is not None:
-            raise InvalidURI(
-                "%s URIs must not include a port number" % (SRV_SCHEME,))
+            raise InvalidURI(f"{SRV_SCHEME} URIs must not include a port number")
 
         # Use the connection timeout. connectTimeoutMS passed as a keyword
         # argument overrides the same option passed in the connection string.
@@ -530,8 +527,7 @@ def parse_uri(uri, default_port=DEFAULT_PORT, validate=True, warn=False,
         dns_resolver = _SrvResolver(fqdn, connect_timeout, srv_service_name,
                                     srv_max_hosts)
         nodes = dns_resolver.get_hosts()
-        dns_options = dns_resolver.get_options()
-        if dns_options:
+        if dns_options := dns_resolver.get_options():
             parsed_dns_options = split_options(
                 dns_options, validate, warn, normalize)
             if set(parsed_dns_options) - _ALLOWED_TXT_OPTS:
@@ -551,7 +547,7 @@ def parse_uri(uri, default_port=DEFAULT_PORT, validate=True, warn=False,
     elif not is_srv and options.get("srvServiceName") is not None:
         raise ConfigurationError("The srvServiceName option is only allowed "
                                  "with 'mongodb+srv://' URIs")
-    elif not is_srv and srv_max_hosts:
+    elif srv_max_hosts:
         raise ConfigurationError("The srvMaxHosts option is only allowed "
                                  "with 'mongodb+srv://' URIs")
     else:

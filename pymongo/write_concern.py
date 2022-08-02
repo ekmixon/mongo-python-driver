@@ -108,8 +108,7 @@ class WriteConcern(object):
         return self.__acknowledged
 
     def __repr__(self):
-        return ("WriteConcern(%s)" % (
-            ", ".join("%s=%s" % kvt for kvt in self.__document.items()),))
+        return f'WriteConcern({", ".join(("%s=%s" % kvt for kvt in self.__document.items()))})'
 
     def __eq__(self, other):
         if isinstance(other, WriteConcern):

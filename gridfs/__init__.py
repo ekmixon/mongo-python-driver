@@ -755,8 +755,7 @@ class GridFSBucket(object):
         res = self._files.delete_one({"_id": file_id}, session=session)
         self._chunks.delete_many({"files_id": file_id}, session=session)
         if not res.deleted_count:
-            raise NoFile(
-                "no file could be deleted because none matched %s" % file_id)
+            raise NoFile(f"no file could be deleted because none matched {file_id}")
 
     def find(self, *args, **kwargs):
         """Find and return the files collection documents that match ``filter``

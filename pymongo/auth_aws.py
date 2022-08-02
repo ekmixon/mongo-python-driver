@@ -81,5 +81,6 @@ def _authenticate_aws(credentials, sock_info):
                 break
     except PyMongoAuthAwsError as exc:
         # Convert to OperationFailure and include pymongo-auth-aws version.
-        raise OperationFailure('%s (pymongo-auth-aws version %s)' % (
-            exc, pymongo_auth_aws.__version__))
+        raise OperationFailure(
+            f'{exc} (pymongo-auth-aws version {pymongo_auth_aws.__version__})'
+        )

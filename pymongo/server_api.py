@@ -112,7 +112,7 @@ class ServerApi(object):
         .. versionadded:: 3.12
         """
         if version != ServerApiVersion.V1:
-            raise ValueError("Unknown ServerApi version: %s" % (version,))
+            raise ValueError(f"Unknown ServerApi version: {version}")
         if strict is not None and not isinstance(strict, bool):
             raise TypeError(
                 "Wrong type for ServerApi strict, value must be an instance "

@@ -1024,7 +1024,7 @@ class MongoClient(common.BaseObject):
 
     def _end_sessions(self, session_ids):
         """Send endSessions command(s) with the given session ids."""
-        try:
+        with contextlib.suppress(PyMongoError):
             # Use SocketInfo.command directly to avoid implicitly creating
             # another session.
             with self._socket_for_reads(
@@ -1038,10 +1038,6 @@ class MongoClient(common.BaseObject):
                                  session_ids[i:i + common._MAX_END_SESSIONS])])
                     sock_info.command(
                         'admin', spec, secondary_ok=secondary_ok, client=self)
-        except PyMongoError:
-            # Drivers MUST ignore any errors returned by the endSessions
-            # command.
-            pass
 
     def close(self):
         """Cleanup client resources and disconnect from MongoDB.
@@ -1058,8 +1054,7 @@ class MongoClient(common.BaseObject):
         .. versionchanged:: 3.6
            End all server sessions created by this client.
         """
-        session_ids = self._topology.pop_all_sessions()
-        if session_ids:
+        if session_ids := self._topology.pop_all_sessions():
             self._end_sessions(session_ids)
         # Stop the periodic task thread and then send pending killCursor
         # requests before closing the topology.
@@ -1119,8 +1114,7 @@ class MongoClient(common.BaseObject):
             topology = self._get_topology()
             if session and not session.in_transaction:
                 session._transaction.reset()
-            address = address or (session and session._pinned_address)
-            if address:
+            if address := address or (session and session._pinned_address):
                 # We're running a getMore or this session is pinned to a mongos.
                 server = topology.select_server_by_address(address)
                 if not server:
@@ -1350,10 +1344,9 @@ class MongoClient(common.BaseObject):
                 if value is dict:
                     return 'document_class=dict'
                 else:
-                    return 'document_class=%s.%s' % (value.__module__,
-                                                     value.__name__)
+                    return f'document_class={value.__module__}.{value.__name__}'
             if option in common.TIMEOUT_OPTIONS and value is not None:
-                return "%s=%s" % (option, int(value * 1000))
+                return f"{option}={int(value * 1000)}"
 
             return '%s=%r' % (option, value)
 
@@ -1374,7 +1367,7 @@ class MongoClient(common.BaseObject):
         return ', '.join(options)
 
     def __repr__(self):
-        return ("MongoClient(%s)" % (self._repr_helper(),))
+        return f"MongoClient({self._repr_helper()})"
 
     def __getattr__(self, name):
         """Get a database by name.
@@ -1432,10 +1425,8 @@ class MongoClient(common.BaseObject):
                         sock_mgr=sock_mgr)
             if sock_mgr:
                 sock_mgr.close()
-        else:
-            # The cursor will be closed later in a different session.
-            if cursor_id or sock_mgr:
-                self._close_cursor_soon(cursor_id, address, sock_mgr)
+        elif cursor_id or sock_mgr:
+            self._close_cursor_soon(cursor_id, address, sock_mgr)
         if session and not explicit_session:
             session._end_session(lock=locks_allowed)
 
@@ -1606,8 +1597,7 @@ class MongoClient(common.BaseObject):
             yield session
             return
 
-        s = self._ensure_session(session)
-        if s:
+        if s := self._ensure_session(session):
             try:
                 yield s
             except Exception as exc:
@@ -1872,16 +1862,14 @@ def _retryable_error_doc(exc):
         # Check the last writeConcernError to determine if this
         # BulkWriteError is retryable.
         wces = exc.details['writeConcernErrors']
-        wce = wces[-1] if wces else None
-        return wce
+        return wces[-1] if wces else None
     if isinstance(exc, (NotPrimaryError, OperationFailure)):
         return exc.details
     return None
 
 
 def _add_retryable_write_error(exc, max_wire_version):
-    doc = _retryable_error_doc(exc)
-    if doc:
+    if doc := _retryable_error_doc(exc):
         code = doc.get('code', 0)
         # retryWrites on MMAPv1 should raise an actionable error.
         if (code == 20 and
@@ -1895,9 +1883,8 @@ def _add_retryable_write_error(exc, max_wire_version):
             # In MongoDB 4.4+, the server reports the error labels.
             for label in doc.get('errorLabels', []):
                 exc._add_error_label(label)
-        else:
-            if code in helpers._RETRYABLE_ERROR_CODES:
-                exc._add_error_label("RetryableWriteError")
+        elif code in helpers._RETRYABLE_ERROR_CODES:
+            exc._add_error_label("RetryableWriteError")
 
     # Connection errors are always retryable except NotPrimaryError which is
     # handled above.
@@ -1943,10 +1930,13 @@ class _MongoClientErrorHandler(object):
                     exc_val._add_error_label("TransientTransactionError")
                 self.session._server_session.mark_dirty()
 
-            if issubclass(exc_type, PyMongoError):
-                if (exc_val.has_error_label("TransientTransactionError") or
-                        exc_val.has_error_label("RetryableWriteError")):
-                    self.session._unpin()
+            if issubclass(exc_type, PyMongoError) and (
+                (
+                    exc_val.has_error_label("TransientTransactionError")
+                    or exc_val.has_error_label("RetryableWriteError")
+                )
+            ):
+                self.session._unpin()
 
         err_ctx = _ErrorContext(
             exc_val, self.max_wire_version, self.sock_generation,

@@ -14,6 +14,7 @@
 
 """Test the change_stream module."""
 
+
 import random
 import os
 import re
@@ -25,7 +26,7 @@ import uuid
 
 from itertools import product
 
-sys.path[0:0] = ['']
+sys.path[:0] = ['']
 
 from bson import ObjectId, SON, Timestamp, encode, json_util
 from bson.binary import (ALL_UUID_REPRESENTATIONS,
@@ -78,10 +79,7 @@ class TestChangeStreamBase(IntegrationTest):
 
     def generate_unique_collnames(self, numcolls):
         """Generate numcolls collection names unique to a test."""
-        collnames = []
-        for idx in range(1, numcolls + 1):
-            collnames.append(self.id() + '_' + str(idx))
-        return collnames
+        return [f'{self.id()}_{str(idx)}' for idx in range(1, numcolls + 1)]
 
     def get_resume_token(self, invalidate=False):
         """Get a resume token to use for starting a change stream."""
@@ -176,7 +174,7 @@ class APITestsMixin(object):
         coll.insert_one({'_id': 1})
         self.addCleanup(coll.drop)
         with self.change_stream_with_client(
-                client, max_await_time_ms=250) as stream:
+                    client, max_await_time_ms=250) as stream:
             self.assertEqual(listener.started_command_names(), ["aggregate"])
             listener.results.clear()
 
@@ -212,8 +210,7 @@ class APITestsMixin(object):
             coll.insert_one({'_id': 3})
             wait_until(lambda: stream.try_next() is not None,
                        "get change from try_next")
-            self.assertEqual(set(listener.started_command_names()),
-                             set(["getMore"]))
+            self.assertEqual(set(listener.started_command_names()), {"getMore"})
             self.assertIsNone(stream.try_next())
 
     def test_batch_size_is_honored(self):
@@ -255,7 +252,7 @@ class APITestsMixin(object):
         coll.insert_many([{"data": i} for i in range(ndocs)])
 
         with self.change_stream(start_at_operation_time=optime) as cs:
-            for i in range(ndocs):
+            for _ in range(ndocs):
                 cs.next()
 
     def _test_full_pipeline(self, expected_cs_stage):
@@ -1103,7 +1100,7 @@ class TestAllLegacyScenarios(IntegrationTest):
         exempt_fields = ["documentKey", "_id", "getMore"]
         for key, value in subdict.items():
             if key not in superdict:
-                self.fail('Key %s not found in %s' % (key, superdict))
+                self.fail(f'Key {key} not found in {superdict}')
             if isinstance(value, dict):
                 self.assert_dict_is_subset(superdict[key], value)
                 continue
@@ -1155,10 +1152,7 @@ def get_change_stream(client, scenario_def, test):
     # Construct change stream kwargs dict
     cs_pipeline = test["changeStreamPipeline"]
     options = test["changeStreamOptions"]
-    cs_options = {}
-    for key, value in options.items():
-        cs_options[camel_to_snake(key)] = value
-
+    cs_options = {camel_to_snake(key): value for key, value in options.items()}
     # Create and return change stream
     return cs_target.watch(pipeline=cs_pipeline, **cs_options)
 
@@ -1256,10 +1250,8 @@ def create_tests():
                 new_test = client_context.require_cluster_type(topologies)(
                     new_test)
 
-                test_name = 'test_%s_%s_%s' % (
-                    dirname,
-                    test_type.replace("-", "_"),
-                    str(test['description'].replace(" ", "_")))
+                test_name = f"""test_{dirname}_{test_type.replace("-", "_")}_{str(test['description'].replace(" ", "_"))}"""
+
 
                 new_test.__name__ = test_name
                 setattr(TestAllLegacyScenarios, new_test.__name__, new_test)

@@ -49,11 +49,7 @@ class CommandCursor(object):
         if self.__killed:
             self.__end_session(True)
 
-        if "ns" in cursor_info:
-            self.__ns = cursor_info["ns"]
-        else:
-            self.__ns = collection.full_name
-
+        self.__ns = cursor_info["ns"] if "ns" in cursor_info else collection.full_name
         self.batch_size(batch_size)
 
         if (not isinstance(max_await_time_ms, int)
@@ -118,7 +114,7 @@ class CommandCursor(object):
         if batch_size < 0:
             raise ValueError("batch_size must be >= 0")
 
-        self.__batch_size = batch_size == 1 and 2 or batch_size
+        self.__batch_size = 2 if batch_size == 1 else batch_size
         return self
 
     def _has_next(self):
@@ -170,10 +166,9 @@ class CommandCursor(object):
             self.close()
             raise
 
-        if isinstance(response, PinnedResponse):
-            if not self.__sock_mgr:
-                self.__sock_mgr = _SocketManager(response.socket_info,
-                                                 response.more_to_come)
+        if isinstance(response, PinnedResponse) and not self.__sock_mgr:
+            self.__sock_mgr = _SocketManager(response.socket_info,
+                                             response.more_to_come)
         if response.from_command:
             cursor = response.docs[0]['cursor']
             documents = cursor['nextBatch']
@@ -279,10 +274,7 @@ class CommandCursor(object):
         """Advance the cursor blocking for at most one getMore command."""
         if not len(self.__data) and not self.__killed and get_more_allowed:
             self._refresh()
-        if len(self.__data):
-            return self.__data.popleft()
-        else:
-            return None
+        return self.__data.popleft() if len(self.__data) else None
 
     def __enter__(self):
         return self

@@ -196,7 +196,7 @@ class _DatabaseAggregationCommand(_AggregationCommand):
 
     @property
     def _cursor_namespace(self):
-        return "%s.$cmd.aggregate" % (self._target.name,)
+        return f"{self._target.name}.$cmd.aggregate"
 
     @property
     def _database(self):

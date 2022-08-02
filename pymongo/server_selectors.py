@@ -23,11 +23,14 @@ class Selection(object):
     @classmethod
     def from_topology_description(cls, topology_description):
         known_servers = topology_description.known_servers
-        primary = None
-        for sd in known_servers:
-            if sd.server_type == SERVER_TYPE.RSPrimary:
-                primary = sd
-                break
+        primary = next(
+            (
+                sd
+                for sd in known_servers
+                if sd.server_type == SERVER_TYPE.RSPrimary
+            ),
+            None,
+        )
 
         return Selection(topology_description,
                          topology_description.known_servers,
@@ -137,8 +140,7 @@ def apply_tag_sets(tag_sets, selection):
     preference.
     """
     for tag_set in tag_sets:
-        with_tag_set = apply_single_tag_set(tag_set, selection)
-        if with_tag_set:
+        if with_tag_set := apply_single_tag_set(tag_set, selection):
             return with_tag_set
 
     return selection.with_server_descriptions([])

@@ -112,9 +112,7 @@ class UpdateResult(_WriteResult):
     def matched_count(self):
         """The number of documents matched for this update."""
         self._raise_if_unacknowledged("matched_count")
-        if self.upserted_id is not None:
-            return 0
-        return self.__raw_result.get("n", 0)
+        return 0 if self.upserted_id is not None else self.__raw_result.get("n", 0)
 
     @property
     def modified_count(self):
@@ -222,5 +220,7 @@ class BulkWriteResult(_WriteResult):
         """A map of operation index to the _id of the upserted document."""
         self._raise_if_unacknowledged("upserted_ids")
         if self.__bulk_api_result:
-            return dict((upsert["index"], upsert["_id"])
-                        for upsert in self.bulk_api_result["upserted"])
+            return {
+                upsert["index"]: upsert["_id"]
+                for upsert in self.bulk_api_result["upserted"]
+            }

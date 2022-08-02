@@ -186,12 +186,13 @@ class SessionOptions(object):
         elif causal_consistency is None:
             causal_consistency = True
         self._causal_consistency = causal_consistency
-        if default_transaction_options is not None:
-            if not isinstance(default_transaction_options, TransactionOptions):
-                raise TypeError(
-                    "default_transaction_options must be an instance of "
-                    "pymongo.client_session.TransactionOptions, not: %r" %
-                    (default_transaction_options,))
+        if default_transaction_options is not None and not isinstance(
+            default_transaction_options, TransactionOptions
+        ):
+            raise TypeError(
+                "default_transaction_options must be an instance of "
+                "pymongo.client_session.TransactionOptions, not: %r" %
+                (default_transaction_options,))
         self._default_transaction_options = default_transaction_options
         self._snapshot = snapshot
 
@@ -251,11 +252,10 @@ class TransactionOptions(object):
         self._write_concern = write_concern
         self._read_preference = read_preference
         self._max_commit_time_ms = max_commit_time_ms
-        if read_concern is not None:
-            if not isinstance(read_concern, ReadConcern):
-                raise TypeError("read_concern must be an instance of "
-                                "pymongo.read_concern.ReadConcern, not: %r" %
-                                (read_concern,))
+        if read_concern is not None and not isinstance(read_concern, ReadConcern):
+            raise TypeError("read_concern must be an instance of "
+                            "pymongo.read_concern.ReadConcern, not: %r" %
+                            (read_concern,))
         if write_concern is not None:
             if not isinstance(write_concern, WriteConcern):
                 raise TypeError("write_concern must be an instance of "
@@ -265,15 +265,17 @@ class TransactionOptions(object):
                 raise ConfigurationError(
                     "transactions do not support unacknowledged write concern"
                     ": %r" % (write_concern,))
-        if read_preference is not None:
-            if not isinstance(read_preference, _ServerMode):
-                raise TypeError("%r is not valid for read_preference. See "
-                                "pymongo.read_preferences for valid "
-                                "options." % (read_preference,))
-        if max_commit_time_ms is not None:
-            if not isinstance(max_commit_time_ms, int):
-                raise TypeError(
-                    "max_commit_time_ms must be an integer or None")
+        if read_preference is not None and not isinstance(
+            read_preference, _ServerMode
+        ):
+            raise TypeError("%r is not valid for read_preference. See "
+                            "pymongo.read_preferences for valid "
+                            "options." % (read_preference,))
+        if max_commit_time_ms is not None and not isinstance(
+            max_commit_time_ms, int
+        ):
+            raise TypeError(
+                "max_commit_time_ms must be an integer or None")
 
     @property
     def read_concern(self):
@@ -305,20 +307,23 @@ def _validate_session_write_concern(session, write_concern):
 
     Returns the session to use for the next operation.
     """
-    if session:
-        if write_concern is not None and not write_concern.acknowledged:
-            # For unacknowledged writes without an explicit session,
-            # drivers SHOULD NOT use an implicit session. If a driver
-            # creates an implicit session for unacknowledged writes
-            # without an explicit session, the driver MUST NOT send the
-            # session ID.
-            if session._implicit:
-                return None
-            else:
-                raise ConfigurationError(
-                    'Explicit sessions are incompatible with '
-                    'unacknowledged write concern: %r' % (
-                        write_concern,))
+    if (
+        session
+        and write_concern is not None
+        and not write_concern.acknowledged
+    ):
+        # For unacknowledged writes without an explicit session,
+        # drivers SHOULD NOT use an implicit session. If a driver
+        # creates an implicit session for unacknowledged writes
+        # without an explicit session, the driver MUST NOT send the
+        # session ID.
+        if session._implicit:
+            return None
+        else:
+            raise ConfigurationError(
+                'Explicit sessions are incompatible with '
+                'unacknowledged write concern: %r' % (
+                    write_concern,))
     return session
 
 
@@ -367,9 +372,7 @@ class _Transaction(object):
 
     @property
     def pinned_conn(self):
-        if self.active() and self.sock_mgr:
-            return self.sock_mgr.sock
-        return None
+        return self.sock_mgr.sock if self.active() and self.sock_mgr else None
 
     def pin(self, server, sock_info):
         self.sharded = True
@@ -519,8 +522,7 @@ class ClientSession(object):
         if val:
             return val
         txn_opts = self.options.default_transaction_options
-        val = txn_opts and getattr(txn_opts, name)
-        if val:
+        if val := txn_opts and getattr(txn_opts, name):
             return val
         return getattr(self.client, name)
 
@@ -676,8 +678,7 @@ class ClientSession(object):
         read_preference = self._inherit_option(
             "read_preference", read_preference)
         if max_commit_time_ms is None:
-            opts = self.options.default_transaction_options
-            if opts:
+            if opts := self.options.default_transaction_options:
                 max_commit_time_ms = opts.max_commit_time_ms
 
         self._transaction.opts = TransactionOptions(
@@ -823,11 +824,13 @@ class ClientSession(object):
 
     def _advance_operation_time(self, operation_time):
         """Internal operation time helper."""
-        if self._operation_time is None:
+        if (
+            self._operation_time is not None
+            and operation_time is not None
+            and operation_time > self._operation_time
+            or self._operation_time is None
+        ):
             self._operation_time = operation_time
-        elif operation_time is not None:
-            if operation_time > self._operation_time:
-                self._operation_time = operation_time
 
     def advance_operation_time(self, operation_time):
         """Update the operation time for this session.
@@ -853,8 +856,7 @@ class ClientSession(object):
                 ct = reply.get('atClusterTime')
             self._snapshot_time = ct
         if self.in_transaction and self._transaction.sharded:
-            recovery_token = reply.get('recoveryToken')
-            if recovery_token:
+            if recovery_token := reply.get('recoveryToken'):
                 self._transaction.recovery_token = recovery_token
 
     @property
@@ -879,9 +881,7 @@ class ClientSession(object):
     @property
     def _pinned_address(self):
         """The mongos address this transaction was created on."""
-        if self._transaction.active():
-            return self._transaction.pinned_address
-        return None
+        return self._transaction.pinned_address if self._transaction.active() else None
 
     @property
     def _pinned_connection(self):
@@ -898,9 +898,7 @@ class ClientSession(object):
 
     def _txn_read_preference(self):
         """Return read preference of this transaction or None."""
-        if self.in_transaction:
-            return self._transaction.opts.read_preference
-        return None
+        return self._transaction.opts.read_preference if self.in_transaction else None
 
     def _apply_to(self, command, is_retryable, read_preference, sock_info):
         self._check_ended()
@@ -927,8 +925,7 @@ class ClientSession(object):
                 command['startTransaction'] = True
 
                 if self._transaction.opts.read_concern:
-                    rc = self._transaction.opts.read_concern.document
-                    if rc:
+                    if rc := self._transaction.opts.read_concern.document:
                         command['readConcern'] = rc
                 self._update_read_concern(command, sock_info)
 

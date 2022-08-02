@@ -69,7 +69,7 @@ def is_ip_address(address):
     try:
         ipaddress.ip_address(address)
         return True
-    except (ValueError, UnicodeError):
+    except ValueError:
         return False
 
 try:
@@ -130,15 +130,13 @@ else:
     def _set_tcp_option(sock, tcp_option, max_value):
         if hasattr(socket, tcp_option):
             sockopt = getattr(socket, tcp_option)
-            try:
+            with contextlib.suppress(socket.error):
                 # PYTHON-1350 - NetBSD doesn't implement getsockopt for
                 # TCP_KEEPIDLE and friends. Don't attempt to set the
                 # values there.
                 default = sock.getsockopt(socket.IPPROTO_TCP, sockopt)
                 if default > max_value:
                     sock.setsockopt(socket.IPPROTO_TCP, sockopt, max_value)
-            except socket.error:
-                pass
 
     def _set_keepalive_times(sock):
         _set_tcp_option(sock, 'TCP_KEEPIDLE', _MAX_TCP_KEEPIDLE)
@@ -204,14 +202,22 @@ else:
 
 if platform.python_implementation().startswith('PyPy'):
     _METADATA['platform'] = ' '.join(
-        (platform.python_implementation(),
-         '.'.join(map(str, sys.pypy_version_info)),
-         '(Python %s)' % '.'.join(map(str, sys.version_info))))
+        (
+            platform.python_implementation(),
+            '.'.join(map(str, sys.pypy_version_info)),
+            f"(Python {'.'.join(map(str, sys.version_info))})",
+        )
+    )
+
 elif sys.platform.startswith('java'):
     _METADATA['platform'] = ' '.join(
-        (platform.python_implementation(),
-         '.'.join(map(str, sys.version_info)),
-         '(%s)' % ' '.join((platform.system(), platform.release()))))
+        (
+            platform.python_implementation(),
+            '.'.join(map(str, sys.version_info)),
+            f"({' '.join((platform.system(), platform.release()))})",
+        )
+    )
+
 else:
     _METADATA['platform'] = ' '.join(
         (platform.python_implementation(),
@@ -232,10 +238,7 @@ def _raise_connection_failure(address, error, msg_prefix=None):
     """Convert a socket.error to ConnectionFailure and raise it."""
     host, port = address
     # If connecting to a Unix socket, port will be None.
-    if port is not None:
-        msg = '%s:%d: %s' % (host, port, error)
-    else:
-        msg = '%s: %s' % (host, error)
+    msg = f'{host}: {error}' if port is None else '%s:%d: %s' % (host, port, error)
     if msg_prefix:
         msg = msg_prefix + msg
     if isinstance(error, socket.timeout):
@@ -316,14 +319,17 @@ class PoolOptions(object):
         # }
         if driver:
             if driver.name:
-                self.__metadata['driver']['name'] = "%s|%s" % (
-                    _METADATA['driver']['name'], driver.name)
+                self.__metadata['driver'][
+                    'name'
+                ] = f"{_METADATA['driver']['name']}|{driver.name}"
+
             if driver.version:
-                self.__metadata['driver']['version'] = "%s|%s" % (
-                    _METADATA['driver']['version'], driver.version)
+                self.__metadata['driver'][
+                    'version'
+                ] = f"{_METADATA['driver']['version']}|{driver.version}"
+
             if driver.platform:
-                self.__metadata['platform'] = "%s|%s" % (
-                    _METADATA['platform'], driver.platform)
+                self.__metadata['platform'] = f"{_METADATA['platform']}|{driver.platform}"
 
     @property
     def non_default_options(self):
@@ -555,8 +561,7 @@ class SocketInfo(object):
         assert not self.pinned_txn
 
     def unpin(self):
-        pool = self.pool_ref()
-        if pool:
+        if pool := self.pool_ref():
             pool.return_socket(self)
         else:
             self.close_socket(ConnectionClosedReason.STALE)
@@ -598,7 +603,7 @@ class SocketInfo(object):
         # unchangeable value per MongoClient.
         creds = _negotiate_creds(all_credentials)
         if creds:
-            cmd['saslSupportedMechs'] = creds.source + '.' + creds.username
+            cmd['saslSupportedMechs'] = f'{creds.source}.{creds.username}'
         auth_ctx = _speculative_context(all_credentials)
         if auth_ctx:
             cmd['speculativeAuthenticate'] = auth_ctx.speculate_command()
@@ -839,11 +844,10 @@ class SocketInfo(object):
 
         Raises error if the client is not the one that created the session.
         """
-        if session:
-            if session._client is not client:
-                raise InvalidOperation(
-                    'Can only use session with the MongoClient that'
-                    ' started it')
+        if session and session._client is not client:
+            raise InvalidOperation(
+                'Can only use session with the MongoClient that'
+                ' started it')
 
     def close_socket(self, reason):
         """Close this connection with a reason."""
@@ -863,10 +867,8 @@ class SocketInfo(object):
             self.cancel_context.cancel()
         # Note: We catch exceptions to avoid spurious errors on interpreter
         # shutdown.
-        try:
+        with contextlib.suppress(Exception):
             self.sock.close()
-        except Exception:
-            pass
 
     def socket_closed(self):
         """Return True if we know socket has been closed, False otherwise."""
@@ -908,10 +910,7 @@ class SocketInfo(object):
         # socket.error, so we catch that, close the socket, and reraise it.
         #
         # The connection closed event will be emitted later in return_socket.
-        if self.ready:
-            reason = None
-        else:
-            reason = ConnectionClosedReason.ERROR
+        reason = None if self.ready else ConnectionClosedReason.ERROR
         self.close_socket(reason)
         # SSLError from PyOpenSSL inherits directly from Exception.
         if isinstance(error, (IOError, OSError, _SSLError)):
@@ -929,11 +928,7 @@ class SocketInfo(object):
         return hash(self.sock)
 
     def __repr__(self):
-        return "SocketInfo(%s)%s at %s" % (
-            repr(self.sock),
-            self.closed and " CLOSED" or "",
-            id(self)
-        )
+        return f'SocketInfo({repr(self.sock)}){self.closed and " CLOSED" or ""} at {id(self)}'
 
 
 def _create_connection(address, options):
@@ -1105,10 +1100,7 @@ class Pool:
           - `options`: a PoolOptions instance
           - `handshake`: whether to call hello for each new SocketInfo
         """
-        if options.pause_enabled:
-            self.state = PoolState.PAUSED
-        else:
-            self.state = PoolState.READY
+        self.state = PoolState.PAUSED if options.pause_enabled else PoolState.READY
         # Check a socket's health with socket_closed() every once in a while.
         # Can override for testing: 0 to always check, None to never check.
         self._check_interval_seconds = 1

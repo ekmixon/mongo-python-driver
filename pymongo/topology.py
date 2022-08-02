@@ -157,17 +157,16 @@ class Topology(object):
         """
         if self._pid is None:
             self._pid = os.getpid()
-        else:
-            if os.getpid() != self._pid:
-                warnings.warn(
-                    "MongoClient opened before fork. Create MongoClient only "
-                    "after forking. See PyMongo's documentation for details: "
-                    "https://pymongo.readthedocs.io/en/stable/faq.html#"
-                    "is-pymongo-fork-safe")
-                with self._lock:
-                    # Reset the session pool to avoid duplicate sessions in
-                    # the child process.
-                    self._session_pool.reset()
+        elif os.getpid() != self._pid:
+            warnings.warn(
+                "MongoClient opened before fork. Create MongoClient only "
+                "after forking. See PyMongo's documentation for details: "
+                "https://pymongo.readthedocs.io/en/stable/faq.html#"
+                "is-pymongo-fork-safe")
+            with self._lock:
+                # Reset the session pool to avoid duplicate sessions in
+                # the child process.
+                self._session_pool.reset()
 
         with self._lock:
             self._ensure_opened()
@@ -289,8 +288,7 @@ class Topology(object):
         if (server_description.is_readable
                 or (server_description.is_server_type_known and
                     new_td.topology_type == TOPOLOGY_TYPE.Single)):
-            server = self._servers.get(server_description.address)
-            if server:
+            if server := self._servers.get(server_description.address):
                 server.pool.ready()
 
         suppress_event = ((self._publish_server or self._publish_tp)
@@ -320,8 +318,7 @@ class Topology(object):
 
         # Clear the pool from a failed heartbeat.
         if reset_pool:
-            server = self._servers.get(server_description.address)
-            if server:
+            if server := self._servers.get(server_description.address):
                 server.pool.reset()
 
         # Wake waiters in select_servers().
@@ -397,7 +394,7 @@ class Topology(object):
                                      TOPOLOGY_TYPE.ReplicaSetNoPrimary):
                 return set()
 
-            return set([sd.address for sd in selector(self._new_selection())])
+            return {sd.address for sd in selector(self._new_selection())}
 
     def get_secondaries(self):
         """Return set of secondary addresses."""
@@ -418,12 +415,14 @@ class Topology(object):
         # highest seen cluster time it MUST become the new highest seen cluster
         # time. Two cluster times are compared using only the BsonTimestamp
         # value of the clusterTime embedded field."
-        if cluster_time:
-            # ">" uses bson.timestamp.Timestamp's comparison operator.
-            if (not self._max_cluster_time
-                or cluster_time['clusterTime'] >
-                    self._max_cluster_time['clusterTime']):
-                self._max_cluster_time = cluster_time
+        if cluster_time and (
+            (
+                not self._max_cluster_time
+                or cluster_time['clusterTime']
+                > self._max_cluster_time['clusterTime']
+            )
+        ):
+            self._max_cluster_time = cluster_time
 
     def receive_cluster_time(self, cluster_time):
         with self._lock:
@@ -517,20 +516,21 @@ class Topology(object):
                     None)
 
             session_timeout = self._description.logical_session_timeout_minutes
-            if session_timeout is None:
-                raise ConfigurationError(
-                    "Sessions are not supported by this MongoDB deployment")
+        if session_timeout is None:
+            raise ConfigurationError(
+                "Sessions are not supported by this MongoDB deployment")
         return session_timeout
 
     def get_server_session(self):
         """Start or resume a server session, or raise ConfigurationError."""
         with self._lock:
             # Sessions are always supported in load balanced mode.
-            if not self._settings.load_balanced:
-                session_timeout = self._check_session_support()
-            else:
-                # Sessions never time out in load balanced mode.
-                session_timeout = float('inf')
+            session_timeout = (
+                float('inf')
+                if self._settings.load_balanced
+                else self._check_session_support()
+            )
+
             return self._session_pool.get_server_session(session_timeout)
 
     def return_server_session(self, server_session, lock):
@@ -597,9 +597,8 @@ class Topology(object):
         cur_tv = server.description.topology_version
         error = err_ctx.error
         error_tv = None
-        if error and hasattr(error, 'details'):
-            if isinstance(error.details, dict):
-                error_tv = error.details.get('topologyVersion')
+        if error and hasattr(error, 'details') and isinstance(error.details, dict):
+            error_tv = error.details.get('topologyVersion')
 
         return _is_stale_error_topology_version(cur_tv, error_tv)
 
@@ -757,14 +756,12 @@ class Topology(object):
             server_plural = 'servers'
 
         if self._description.known_servers:
-            # We've connected, but no servers match the selector.
-            if selector is writable_server_selector:
-                if is_replica_set:
-                    return 'No primary available for writes'
-                else:
-                    return 'No %s available for writes' % server_plural
-            else:
+            if selector is not writable_server_selector:
                 return 'No %s match selector "%s"' % (server_plural, selector)
+            if is_replica_set:
+                return 'No primary available for writes'
+            else:
+                return f'No {server_plural} available for writes'
         else:
             addresses = list(self._description.server_descriptions())
             servers = list(self._description.server_descriptions().values())
@@ -774,33 +771,30 @@ class Topology(object):
                     return 'No %s available for replica set name "%s"' % (
                         server_plural, self._settings.replica_set_name)
                 else:
-                    return 'No %s available' % server_plural
+                    return f'No {server_plural} available'
 
             # 1 or more servers, all Unknown. Are they unknown for one reason?
             error = servers[0].error
             same = all(server.error == error for server in servers[1:])
-            if same:
-                if error is None:
-                    # We're still discovering.
-                    return 'No %s found yet' % server_plural
-
-                if (is_replica_set and not
-                        set(addresses).intersection(self._seed_addresses)):
-                    # We replaced our seeds with new hosts but can't reach any.
-                    return (
-                        'Could not reach any servers in %s. Replica set is'
-                        ' configured with internal hostnames or IPs?' %
-                        addresses)
-
-                return str(error)
-            else:
+            if not same:
                 return ','.join(str(server.error) for server in servers
                                 if server.error)
+            if error is None:
+                    # We're still discovering.
+                return f'No {server_plural} found yet'
+
+            if (is_replica_set and not
+                    set(addresses).intersection(self._seed_addresses)):
+                # We replaced our seeds with new hosts but can't reach any.
+                return (
+                    'Could not reach any servers in %s. Replica set is'
+                    ' configured with internal hostnames or IPs?' %
+                    addresses)
+
+            return str(error)
 
     def __repr__(self):
-        msg = ''
-        if not self._opened:
-            msg = 'CLOSED '
+        msg = '' if self._opened else 'CLOSED '
         return '<%s %s%r>' % (self.__class__.__name__, msg, self._description)
 
 

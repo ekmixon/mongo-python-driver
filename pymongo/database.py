@@ -302,7 +302,7 @@ class Database(common.BaseObject):
             if ((not s or not s.in_transaction) and
                     name in self.list_collection_names(
                         filter={"name": name}, session=s)):
-                raise CollectionInvalid("collection %s already exists" % name)
+                raise CollectionInvalid(f"collection {name} already exists")
 
             return Collection(self, name, True, codec_options,
                               read_preference, write_concern,
@@ -788,8 +788,7 @@ class Database(common.BaseObject):
         if "result" in result:
             info = result["result"]
             if info.find("exception") != -1 or info.find("corrupt") != -1:
-                raise CollectionInvalid("%s invalid: %s" % (name, info))
-        # Sharded results
+                raise CollectionInvalid(f"{name} invalid: {info}")
         elif "raw" in result:
             for _, res in result["raw"].items():
                 if "result" in res:
@@ -801,7 +800,6 @@ class Database(common.BaseObject):
                 elif not res.get("valid", False):
                     valid = False
                     break
-        # Post 1.9 non-sharded results.
         elif not result.get("valid", False):
             valid = False
 
@@ -845,7 +843,7 @@ class Database(common.BaseObject):
            Added ``session`` parameter.
         """
         if not isinstance(dbref, DBRef):
-            raise TypeError("cannot dereference a %s" % type(dbref))
+            raise TypeError(f"cannot dereference a {type(dbref)}")
         if dbref.database is not None and dbref.database != self.__name:
             raise ValueError("trying to dereference a DBRef that points to "
                              "another database (%r not %r)" % (dbref.database,

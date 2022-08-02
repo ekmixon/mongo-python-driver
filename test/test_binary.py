@@ -14,6 +14,7 @@
 
 """Tests for the Binary wrapper."""
 
+
 import array
 import base64
 import copy
@@ -23,7 +24,7 @@ import platform
 import sys
 import uuid
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 import bson
 
@@ -321,12 +322,12 @@ class TestBinary(unittest.TestCase):
     def test_pickle(self):
         b1 = Binary(b'123', 2)
 
-        # For testing backwards compatibility with pre-2.4 pymongo
-        p = (b"\x80\x03cbson.binary\nBinary\nq\x00C\x03123q\x01\x85q"
-             b"\x02\x81q\x03}q\x04X\x10\x00\x00\x00_Binary__subtypeq"
-             b"\x05K\x02sb.")
-
         if not sys.version.startswith('3.0'):
+            # For testing backwards compatibility with pre-2.4 pymongo
+            p = (b"\x80\x03cbson.binary\nBinary\nq\x00C\x03123q\x01\x85q"
+                 b"\x02\x81q\x03}q\x04X\x10\x00\x00\x00_Binary__subtypeq"
+                 b"\x05K\x02sb.")
+
             self.assertEqual(b1, pickle.loads(p))
 
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
@@ -469,10 +470,11 @@ class TestUuidSpecImplicitCoding(IntegrationTest):
     def _get_coll_w_uuid_rep(self, uuid_rep):
         codec_options = self.client.codec_options.with_options(
             uuid_representation=validate_uuid_representation(None, uuid_rep))
-        coll = self.db.get_collection(
-            'pymongo_test', codec_options=codec_options,
-            write_concern=WriteConcern("majority"))
-        return coll
+        return self.db.get_collection(
+            'pymongo_test',
+            codec_options=codec_options,
+            write_concern=WriteConcern("majority"),
+        )
 
     def _test_encoding(self, uuid_rep, expected_hexstring, expected_subtype):
         coll = self._get_coll_w_uuid_rep(uuid_rep)

@@ -151,8 +151,11 @@ class Collection(common.BaseObject):
 
         if not name or ".." in name:
             raise InvalidName("collection names cannot be empty")
-        if "$" in name and not (name.startswith("oplog.$main") or
-                                name.startswith("$cmd")):
+        if (
+            "$" in name
+            and not name.startswith("oplog.$main")
+            and not name.startswith("$cmd")
+        ):
             raise InvalidName("collection names must not "
                               "contain '$': %r" % name)
         if name[0] == "." or name[-1] == ".":
@@ -165,7 +168,7 @@ class Collection(common.BaseObject):
 
         self.__database = database
         self.__name = name
-        self.__full_name = "%s.%s" % (self.__database.name, self.__name)
+        self.__full_name = f"{self.__database.name}.{self.__name}"
         if create or kwargs or collation:
             self.__create(kwargs, collation, session)
 
@@ -258,7 +261,7 @@ class Collection(common.BaseObject):
           - `name`: the name of the collection to get
         """
         if name.startswith('_'):
-            full_name = "%s.%s" % (self.__name, name)
+            full_name = f"{self.__name}.{name}"
             raise AttributeError(
                 "Collection has no attribute %r. To access the %s"
                 " collection, use database['%s']." % (
@@ -266,13 +269,15 @@ class Collection(common.BaseObject):
         return self.__getitem__(name)
 
     def __getitem__(self, name):
-        return Collection(self.__database,
-                          "%s.%s" % (self.__name, name),
-                          False,
-                          self.codec_options,
-                          self.read_preference,
-                          self.write_concern,
-                          self.read_concern)
+        return Collection(
+            self.__database,
+            f"{self.__name}.{name}",
+            False,
+            self.codec_options,
+            self.read_preference,
+            self.write_concern,
+            self.read_concern,
+        )
 
     def __repr__(self):
         return "Collection(%r, %r)" % (self.__database, self.__name)
@@ -578,7 +583,7 @@ class Collection(common.BaseObject):
 
         write_concern = self._write_concern_for(session)
         blk = _Bulk(self, ordered, bypass_document_validation)
-        blk.ops = [doc for doc in gen()]
+        blk.ops = list(gen())
         blk.execute(write_concern, session=session)
         return InsertManyResult(inserted_ids, write_concern.acknowledged)
 
@@ -647,9 +652,7 @@ class Collection(common.BaseObject):
             if 'upserted' in result:
                 result['upserted'] = result['upserted'][0]['_id']
 
-        if not acknowledged:
-            return None
-        return result
+        return result if acknowledged else None
 
     def _update_retryable(
             self, criteria, document, upsert=False,
@@ -1344,9 +1347,7 @@ class Collection(common.BaseObject):
             read_concern=self.read_concern,
             collation=collation,
             session=session)
-        if res.get("errmsg", "") == "ns missing":
-            return 0
-        return int(res["n"])
+        return 0 if res.get("errmsg", "") == "ns missing" else int(res["n"])
 
     def _aggregate_one_result(
             self, sock_info, secondary_ok, cmd, collation, session):
@@ -1401,9 +1402,7 @@ class Collection(common.BaseObject):
                 cmd.update(kwargs)
                 result = self._aggregate_one_result(
                     sock_info, secondary_ok, cmd, collation=None, session=session)
-                if not result:
-                    return 0
-                return int(result['n'])
+                return int(result['n']) if result else 0
             else:
                 # MongoDB < 4.9
                 cmd = SON([('count', self.__name)])
@@ -1488,9 +1487,7 @@ class Collection(common.BaseObject):
         def _cmd(session, server, sock_info, secondary_ok):
             result = self._aggregate_one_result(
                 sock_info, secondary_ok, cmd, collation, session)
-            if not result:
-                return 0
-            return result['n']
+            return result['n'] if result else 0
 
         return self.__database.client._retryable_read(
             _cmd, self._read_preference_for(session), session)
@@ -2148,7 +2145,7 @@ class Collection(common.BaseObject):
         if "$" in new_name and not new_name.startswith("oplog.$main"):
             raise InvalidName("collection names must not contain '$'")
 
-        new_name = "%s.%s" % (self.__database.name, new_name)
+        new_name = f"{self.__database.name}.{new_name}"
         cmd = SON([("renameCollection", self.__full_name), ("to", new_name)])
         cmd.update(kwargs)
         write_concern = self._write_concern_for_cmd(cmd, session)
@@ -2245,9 +2242,8 @@ class Collection(common.BaseObject):
         if upsert is not None:
             common.validate_boolean("upsert", upsert)
             cmd["upsert"] = upsert
-        if hint is not None:
-            if not isinstance(hint, str):
-                hint = helpers._index_document(hint)
+        if hint is not None and not isinstance(hint, str):
+            hint = helpers._index_document(hint)
 
         write_concern = self._write_concern_for_cmd(cmd, session)
 

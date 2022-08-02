@@ -138,8 +138,7 @@ class Monitor(MonitorBase):
         Note: this is called from a weakref.proxy callback and MUST NOT take
         any locks.
         """
-        context = self._cancel_context
-        if context:
+        if context := self._cancel_context:
             # Note: we cannot close the socket because doing so may cause
             # concurrent reads/writes to hang until a timeout occurs
             # (depending on the platform).
@@ -302,8 +301,7 @@ class SrvMonitor(MonitorBase):
         self._srv_service_name = self._settings._srv_service_name
 
     def _run(self):
-        seedlist = self._get_seedlist()
-        if seedlist:
+        if seedlist := self._get_seedlist():
             self._seedlist = seedlist
             try:
                 self._topology.on_srv_update(self._seedlist)
@@ -421,20 +419,16 @@ def _shutdown_monitors():
 
     # Close all monitors.
     for ref in monitors:
-        monitor = ref()
-        if monitor:
+        if monitor := ref():
             monitor.gc_safe_close()
 
     monitor = None
 
 
 def _shutdown_resources():
-    # _shutdown_monitors/_shutdown_executors may already be GC'd at shutdown.
-    shutdown = _shutdown_monitors
-    if shutdown:
+    if shutdown := _shutdown_monitors:
         shutdown()
-    shutdown = _shutdown_executors
-    if shutdown:
+    if shutdown := _shutdown_executors:
         shutdown()
 
 

@@ -261,7 +261,7 @@ class Binary(bytes):
             payload = uuid.bytes
         elif uuid_representation == UuidRepresentation.JAVA_LEGACY:
             from_uuid = uuid.bytes
-            payload = from_uuid[0:8][::-1] + from_uuid[8:16][::-1]
+            payload = from_uuid[:8][::-1] + from_uuid[8:16][::-1]
         elif uuid_representation == UuidRepresentation.CSHARP_LEGACY:
             payload = uuid.bytes_le
         else:
@@ -289,8 +289,7 @@ class Binary(bytes):
         .. versionadded:: 3.11
         """
         if self.subtype not in ALL_UUID_SUBTYPES:
-            raise ValueError("cannot decode subtype %s as a uuid" % (
-                self.subtype,))
+            raise ValueError(f"cannot decode subtype {self.subtype} as a uuid")
 
         if uuid_representation not in ALL_UUID_REPRESENTATIONS:
             raise ValueError("uuid_representation must be a value from "
@@ -303,17 +302,16 @@ class Binary(bytes):
                 return UUID(bytes=self)
         elif uuid_representation == UuidRepresentation.JAVA_LEGACY:
             if self.subtype == OLD_UUID_SUBTYPE:
-                return UUID(bytes=self[0:8][::-1] + self[8:16][::-1])
+                return UUID(bytes=self[:8][::-1] + self[8:16][::-1])
         elif uuid_representation == UuidRepresentation.CSHARP_LEGACY:
             if self.subtype == OLD_UUID_SUBTYPE:
                 return UUID(bytes_le=self)
-        else:
-            # uuid_representation == UuidRepresentation.STANDARD
-            if self.subtype == UUID_SUBTYPE:
-                return UUID(bytes=self)
+        elif self.subtype == UUID_SUBTYPE:
+            return UUID(bytes=self)
 
-        raise ValueError("cannot decode subtype %s to %s" % (
-                self.subtype, UUID_REPRESENTATION_NAMES[uuid_representation]))
+        raise ValueError(
+            f"cannot decode subtype {self.subtype} to {UUID_REPRESENTATION_NAMES[uuid_representation]}"
+        )
 
     @property
     def subtype(self):
@@ -344,4 +342,4 @@ class Binary(bytes):
         return not self == other
 
     def __repr__(self):
-        return "Binary(%s, %s)" % (bytes.__repr__(self), self.__subtype)
+        return f"Binary({bytes.__repr__(self)}, {self.__subtype})"

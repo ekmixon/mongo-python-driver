@@ -187,7 +187,7 @@ class Collation(object):
         if backwards is not None:
             self.__document['backwards'] = common.validate_boolean(
                 'backwards', backwards)
-        self.__document.update(kwargs)
+        self.__document |= kwargs
 
     @property
     def document(self):
@@ -201,8 +201,7 @@ class Collation(object):
 
     def __repr__(self):
         document = self.document
-        return 'Collation(%s)' % (
-            ', '.join('%s=%r' % (key, document[key]) for key in document),)
+        return f"Collation({', '.join(('%s=%r' % (key, document[key]) for key in document))})"
 
     def __eq__(self, other):
         if isinstance(other, Collation):

@@ -14,10 +14,11 @@
 
 """Test the collection module."""
 
+
 import os
 import sys
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 from pymongo import operations, WriteConcern
 from pymongo.command_cursor import CommandCursor
@@ -53,10 +54,7 @@ def check_result(self, expected_result, result):
             # SPEC-869: Only BulkWriteResult has upserted_count.
             if (prop == "upserted_count"
                     and not isinstance(result, BulkWriteResult)):
-                if result.upserted_id is not None:
-                    upserted_count = 1
-                else:
-                    upserted_count = 0
+                upserted_count = 1 if result.upserted_id is not None else 0
                 self.assertEqual(upserted_count, expected_result[res], msg)
             elif prop == "inserted_ids":
                 # BulkWriteResult does not have inserted_ids.
@@ -73,9 +71,7 @@ def check_result(self, expected_result, result):
             elif prop == "upserted_ids":
                 # Convert indexes from strings to integers.
                 ids = expected_result[res]
-                expected_ids = {}
-                for str_index in ids:
-                    expected_ids[int(str_index)] = ids[str_index]
+                expected_ids = {int(str_index): ids[str_index] for str_index in ids}
                 self.assertEqual(expected_ids, result.upserted_ids, msg)
             else:
                 self.assertEqual(
@@ -127,10 +123,7 @@ def run_operation(collection, test):
 
     result = cmd(**arguments)
 
-    if isinstance(result, Cursor) or isinstance(result, CommandCursor):
-        return list(result)
-
-    return result
+    return list(result) if isinstance(result, (Cursor, CommandCursor)) else result
 
 
 def create_test(scenario_def, test, name):
@@ -158,10 +151,7 @@ def create_test(scenario_def, test, name):
         expected_c = test['outcome'].get('collection')
         if expected_c is not None:
             expected_name = expected_c.get('name')
-            if expected_name is not None:
-                db_coll = self.db[expected_name]
-            else:
-                db_coll = self.db.test
+            db_coll = self.db[expected_name] if expected_name is not None else self.db.test
             db_coll = db_coll.with_options(
                 read_concern=ReadConcern(level="local"))
             self.assertEqual(list(db_coll.find()), expected_c['data'])

@@ -96,8 +96,7 @@ def _merge_command(run, full_result, offset, result):
         full_result["nRemoved"] += affected
 
     elif run.op_type == _UPDATE:
-        upserted = result.get("upserted")
-        if upserted:
+        if upserted := result.get("upserted"):
             n_upserted = len(upserted)
             for doc in upserted:
                 doc["index"] = run.index(doc["index"] + offset)
@@ -108,8 +107,7 @@ def _merge_command(run, full_result, offset, result):
             full_result["nMatched"] += affected
         full_result["nModified"] += result["nModified"]
 
-    write_errors = result.get("writeErrors")
-    if write_errors:
+    if write_errors := result.get("writeErrors"):
         for doc in write_errors:
             # Leave the server response intact for APM.
             replacement = doc.copy()
@@ -119,8 +117,7 @@ def _merge_command(run, full_result, offset, result):
             replacement["op"] = run.ops[idx]
             full_result["writeErrors"].append(replacement)
 
-    wc_error = result.get("writeConcernError")
-    if wc_error:
+    if wc_error := result.get("writeConcernError"):
         full_result["writeConcernErrors"].append(wc_error)
 
 
@@ -435,14 +432,9 @@ class _Bulk(object):
         write_concern = write_concern or self.collection.write_concern
         session = _validate_session_write_concern(session, write_concern)
 
-        if self.ordered:
-            generator = self.gen_ordered()
-        else:
-            generator = self.gen_unordered()
-
+        generator = self.gen_ordered() if self.ordered else self.gen_unordered()
         client = self.collection.database.client
-        if not write_concern.acknowledged:
-            with client._socket_for_writes(session) as sock_info:
-                self.execute_no_results(sock_info, generator)
-        else:
+        if write_concern.acknowledged:
             return self.execute_command(generator, write_concern, session)
+        with client._socket_for_writes(session) as sock_info:
+            self.execute_no_results(sock_info, generator)

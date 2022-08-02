@@ -145,8 +145,11 @@ class TopologyDescription(object):
             topology_type = self._topology_type
 
         # The default ServerDescription's type is Unknown.
-        sds = dict((address, ServerDescription(address))
-                   for address in self._server_descriptions)
+        sds = {
+            address: ServerDescription(address)
+            for address in self._server_descriptions
+        }
+
 
         return TopologyDescription(
             topology_type,
@@ -214,8 +217,7 @@ class TopologyDescription(object):
     @property
     def common_wire_version(self):
         """Minimum of all servers' max wire versions, or None."""
-        servers = self.known_servers
-        if servers:
+        if servers := self.known_servers:
             return min(s.max_wire_version for s in self.known_servers)
 
         return None
@@ -625,8 +627,11 @@ def _check_has_primary(sds):
 
     Returns new topology type.
     """
-    for s in sds.values():
-        if s.server_type == SERVER_TYPE.RSPrimary:
-            return TOPOLOGY_TYPE.ReplicaSetWithPrimary
-    else:
-        return TOPOLOGY_TYPE.ReplicaSetNoPrimary
+    return next(
+        (
+            TOPOLOGY_TYPE.ReplicaSetWithPrimary
+            for s in sds.values()
+            if s.server_type == SERVER_TYPE.RSPrimary
+        ),
+        TOPOLOGY_TYPE.ReplicaSetNoPrimary,
+    )

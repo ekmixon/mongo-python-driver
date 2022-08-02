@@ -90,7 +90,7 @@ class NetworkTimeout(AutoReconnect):
 
 def _format_detailed_error(message, details):
     if details is not None:
-        message = "%s, full error: %s" % (message, details)
+        message = f"{message}, full error: {details}"
     return message
 
 
@@ -140,9 +140,7 @@ class OperationFailure(PyMongoError):
     """
 
     def __init__(self, error, code=None, details=None, max_wire_version=None):
-        error_labels = None
-        if details is not None:
-            error_labels = details.get('errorLabels')
+        error_labels = details.get('errorLabels') if details is not None else None
         super(OperationFailure, self).__init__(
             _format_detailed_error(error, details), error_labels=error_labels)
         self.__code = code

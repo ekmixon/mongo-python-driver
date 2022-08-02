@@ -66,9 +66,7 @@ class ReadConcern(object):
         return NotImplemented
 
     def __repr__(self):
-        if self.level:
-            return 'ReadConcern(%s)' % self.level
-        return 'ReadConcern()'
+        return f'ReadConcern({self.level})' if self.level else 'ReadConcern()'
 
 
 DEFAULT_READ_CONCERN = ReadConcern()

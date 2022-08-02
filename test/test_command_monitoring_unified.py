@@ -14,10 +14,11 @@
 
 """Run the command monitoring unified format spec tests."""
 
+
 import os
 import sys
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 from test import unittest
 from test.unified_format import generate_test_classes

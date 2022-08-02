@@ -124,10 +124,9 @@ class TypeRegistry(object):
         self._encoder_map = {}
         self._decoder_map = {}
 
-        if self._fallback_encoder is not None:
-            if not callable(fallback_encoder):
-                raise TypeError("fallback_encoder %r is not a callable" % (
-                    fallback_encoder))
+        if self._fallback_encoder is not None and not callable(fallback_encoder):
+            raise TypeError("fallback_encoder %r is not a callable" % (
+                fallback_encoder))
 
         for codec in self.__type_codecs:
             is_valid_codec = False
@@ -159,11 +158,15 @@ class TypeRegistry(object):
             self._fallback_encoder))
 
     def __eq__(self, other):
-        if not isinstance(other, type(self)):
-            return NotImplemented
-        return ((self._decoder_map == other._decoder_map) and
-                (self._encoder_map == other._encoder_map) and
-                (self._fallback_encoder == other._fallback_encoder))
+        return (
+            (
+                (self._decoder_map == other._decoder_map)
+                and (self._encoder_map == other._encoder_map)
+                and (self._fallback_encoder == other._fallback_encoder)
+            )
+            if isinstance(other, type(self))
+            else NotImplemented
+        )
 
 
 _options_base = namedtuple(
@@ -311,7 +314,7 @@ class CodecOptions(_options_base):
             'type_registry': self.type_registry}
 
     def __repr__(self):
-        return '%s(%s)' % (self.__class__.__name__, self._arguments_repr())
+        return f'{self.__class__.__name__}({self._arguments_repr()})'
 
     def with_options(self, **kwargs):
         """Make a copy of this CodecOptions, overriding some options::

@@ -15,7 +15,7 @@
 import os
 import sys
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 from test import client_context, SkipTest, unittest
 

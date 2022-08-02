@@ -14,12 +14,13 @@
 
 """Execute Transactions Spec tests."""
 
+
 import os
 import sys
 import threading
 import time
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 from bson.son import SON
 from bson.objectid import ObjectId
@@ -114,8 +115,11 @@ class TestCMAP(IntegrationTest):
         event = OBJECT_TYPES[op['event']]
         count = op['count']
         timeout = op.get('timeout', 10000) / 1000.0
-        wait_until(lambda: self.listener.event_count(event) >= count,
-                   'find %s %s event(s)' % (count, event), timeout=timeout)
+        wait_until(
+            lambda: self.listener.event_count(event) >= count,
+            f'find {count} {event} event(s)',
+            timeout=timeout,
+        )
 
     def check_out(self, op):
         """Run the 'checkOut' operation."""
@@ -232,10 +236,7 @@ class TestCMAP(IntegrationTest):
         opts['connect'] = False
         # Support backgroundThreadIntervalMS, default to 50ms.
         interval = opts.pop('backgroundThreadIntervalMS', 50)
-        if interval < 0:
-            kill_cursor_frequency = 99999999
-        else:
-            kill_cursor_frequency = interval/1000.0
+        kill_cursor_frequency = 99999999 if interval < 0 else interval/1000.0
         with client_knobs(kill_cursor_frequency=kill_cursor_frequency,
                           min_heartbeat_interval=.05):
             client = single_client(**opts)
@@ -259,9 +260,9 @@ class TestCMAP(IntegrationTest):
         self.pool = list(client._topology._servers.values())[0].pool
 
         # Map of target names to Thread objects.
-        self.targets = dict()
+        self.targets = {}
         # Map of label names to Connection objects
-        self.labels = dict()
+        self.labels = {}
 
         def cleanup():
             for t in self.targets.values():
@@ -332,9 +333,8 @@ class TestCMAP(IntegrationTest):
             self.assertEqual(pool.opts, pool_opts)
 
     def test_3_uri_connection_pool_options(self):
-        opts = '&'.join(['%s=%s' % (k, v)
-                         for k, v in self.POOL_OPTIONS.items()])
-        uri = 'mongodb://%s/?%s' % (client_context.pair, opts)
+        opts = '&'.join([f'{k}={v}' for k, v in self.POOL_OPTIONS.items()])
+        uri = f'mongodb://{client_context.pair}/?{opts}'
         client = rs_or_single_client(uri)
         self.addCleanup(client.close)
         pool_opts = get_pool(client).opts

@@ -468,7 +468,7 @@ def _to_micros(dur):
 def _validate_event_listeners(option, listeners):
     """Validate event listeners"""
     if not isinstance(listeners, abc.Sequence):
-        raise TypeError("%s must be a list or tuple" % (option,))
+        raise TypeError(f"{option} must be a list or tuple")
     for listener in listeners:
         if not isinstance(listener, _EventListener):
             raise TypeError("Listeners for %s must be either a "
@@ -505,18 +505,26 @@ def register(listener):
 # Note - to avoid bugs from forgetting which if these is all lowercase and
 # which are camelCase, and at the same time avoid having to add a test for
 # every command, use all lowercase here and test against command_name.lower().
-_SENSITIVE_COMMANDS = set(
-    ["authenticate", "saslstart", "saslcontinue", "getnonce", "createuser",
-     "updateuser", "copydbgetnonce", "copydbsaslstart", "copydb"])
+_SENSITIVE_COMMANDS = {
+    "authenticate",
+    "saslstart",
+    "saslcontinue",
+    "getnonce",
+    "createuser",
+    "updateuser",
+    "copydbgetnonce",
+    "copydbsaslstart",
+    "copydb",
+}
 
 
 # The "hello" command is also deemed sensitive when attempting speculative
 # authentication.
 def _is_speculative_authenticate(command_name, doc):
-    if (command_name.lower() in ('hello', HelloCompat.LEGACY_CMD) and
-            'speculativeAuthenticate' in doc):
-        return True
-    return False
+    return (
+        command_name.lower() in ('hello', HelloCompat.LEGACY_CMD)
+        and 'speculativeAuthenticate' in doc
+    )
 
 
 class _CommandEvent(object):
@@ -1029,8 +1037,7 @@ class _ServerEvent(object):
         return self.__topology_id
 
     def __repr__(self):
-        return "<%s %s topology_id: %s>" % (
-            self.__class__.__name__, self.server_address, self.topology_id)
+        return f"<{self.__class__.__name__} {self.server_address} topology_id: {self.topology_id}>"
 
 
 class ServerDescriptionChangedEvent(_ServerEvent):
@@ -1059,9 +1066,7 @@ class ServerDescriptionChangedEvent(_ServerEvent):
         return self.__new_description
 
     def __repr__(self):
-        return "<%s %s changed from: %s, to: %s>" % (
-            self.__class__.__name__, self.server_address,
-            self.previous_description, self.new_description)
+        return f"<{self.__class__.__name__} {self.server_address} changed from: {self.previous_description}, to: {self.new_description}>"
 
 
 class ServerOpeningEvent(_ServerEvent):
@@ -1096,8 +1101,7 @@ class TopologyEvent(object):
         return self.__topology_id
 
     def __repr__(self):
-        return "<%s topology_id: %s>" % (
-            self.__class__.__name__, self.topology_id)
+        return f"<{self.__class__.__name__} topology_id: {self.topology_id}>"
 
 
 class TopologyDescriptionChangedEvent(TopologyEvent):
@@ -1126,9 +1130,7 @@ class TopologyDescriptionChangedEvent(TopologyEvent):
         return self.__new_description
 
     def __repr__(self):
-        return "<%s topology_id: %s changed from: %s, to: %s>" % (
-            self.__class__.__name__, self.topology_id,
-            self.previous_description, self.new_description)
+        return f"<{self.__class__.__name__} topology_id: {self.topology_id} changed from: {self.previous_description}, to: {self.new_description}>"
 
 
 class TopologyOpenedEvent(TopologyEvent):
@@ -1164,7 +1166,7 @@ class _ServerHeartbeatEvent(object):
         return self.__connection_id
 
     def __repr__(self):
-        return "<%s %s>" % (self.__class__.__name__, self.connection_id)
+        return f"<{self.__class__.__name__} {self.connection_id}>"
 
 
 class ServerHeartbeatStartedEvent(_ServerHeartbeatEvent):
@@ -1211,9 +1213,7 @@ class ServerHeartbeatSucceededEvent(_ServerHeartbeatEvent):
         return self.__awaited
 
     def __repr__(self):
-        return "<%s %s duration: %s, awaited: %s, reply: %s>" % (
-            self.__class__.__name__, self.connection_id,
-            self.duration, self.awaited, self.reply)
+        return f"<{self.__class__.__name__} {self.connection_id} duration: {self.duration}, awaited: {self.awaited}, reply: {self.reply}>"
 
 
 class ServerHeartbeatFailedEvent(_ServerHeartbeatEvent):

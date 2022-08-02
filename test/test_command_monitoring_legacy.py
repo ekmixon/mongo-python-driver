@@ -14,11 +14,12 @@
 
 """Run the command monitoring legacy-format spec tests."""
 
+
 import os
 import re
 import sys
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 import pymongo
 
@@ -102,7 +103,7 @@ def create_test(scenario_def, test):
             bulk_args = []
             for request in args['requests']:
                 opname = request['name']
-                klass = opname[0:1].upper() + opname[1:]
+                klass = opname[:1].upper() + opname[1:]
                 arg = getattr(pymongo, klass)(**request['arguments'])
                 bulk_args.append(arg)
             try:
@@ -160,7 +161,7 @@ def create_test(scenario_def, test):
                         for doc in reply['writeErrors']:
                             # Remove any new fields the server adds. The tests
                             # only have index, code, and errmsg.
-                            diff = set(doc) - set(['index', 'code', 'errmsg'])
+                            diff = set(doc) - {'index', 'code', 'errmsg'}
                             for field in diff:
                                 doc.pop(field)
                             doc['code'] = 42
@@ -233,10 +234,8 @@ def create_tests():
                         new_test = client_context.require_no_mongos(None)(
                             new_test)
 
-                test_name = 'test_%s_%s_%s' % (
-                    dirname,
-                    os.path.splitext(filename)[0],
-                    str(test['description'].replace(" ", "_")))
+                test_name = f"""test_{dirname}_{os.path.splitext(filename)[0]}_{str(test['description'].replace(" ", "_"))}"""
+
                 new_test.__name__ = test_name
                 setattr(TestAllScenarios, new_test.__name__, new_test)
 

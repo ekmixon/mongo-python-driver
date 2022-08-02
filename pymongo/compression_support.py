@@ -37,8 +37,8 @@ except ImportError:
 from pymongo.hello import HelloCompat
 from pymongo.monitoring import _SENSITIVE_COMMANDS
 
-_SUPPORTED_COMPRESSORS = set(["snappy", "zlib", "zstd"])
-_NO_COMPRESSION = set([HelloCompat.CMD, HelloCompat.LEGACY_CMD])
+_SUPPORTED_COMPRESSORS = {"snappy", "zlib", "zstd"}
+_NO_COMPRESSION = {HelloCompat.CMD, HelloCompat.LEGACY_CMD}
 _NO_COMPRESSION.update(_SENSITIVE_COMMANDS)
 
 
@@ -53,7 +53,7 @@ def validate_compressors(dummy, value):
     for compressor in compressors[:]:
         if compressor not in _SUPPORTED_COMPRESSORS:
             compressors.remove(compressor)
-            warnings.warn("Unsupported compressor: %s" % (compressor,))
+            warnings.warn(f"Unsupported compressor: {compressor}")
         elif compressor == "snappy" and not _HAVE_SNAPPY:
             compressors.remove(compressor)
             warnings.warn(

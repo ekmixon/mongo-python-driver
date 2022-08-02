@@ -122,11 +122,10 @@ def is_server_resolvable():
     socket_timeout = socket.getdefaulttimeout()
     socket.setdefaulttimeout(1)
     try:
-        try:
-            socket.gethostbyname('server')
-            return True
-        except socket.error:
-            return False
+        socket.gethostbyname('server')
+        return True
+    except socket.error:
+        return False
     finally:
         socket.setdefaulttimeout(socket_timeout)
 
@@ -220,7 +219,7 @@ class client_knobs(object):
 
 
 def _all_users(db):
-    return set(u['user'] for u in db.command('usersInfo').get('users', []))
+    return {u['user'] for u in db.command('usersInfo').get('users', [])}
 
 
 class ClientContext(object):
@@ -281,11 +280,8 @@ class ClientContext(object):
 
     def _connect(self, host, port, **kwargs):
         # Jython takes a long time to connect.
-        if sys.platform.startswith('java'):
-            timeout_ms = 10000
-        else:
-            timeout_ms = 5000
-        kwargs.update(self.default_client_options)
+        timeout_ms = 10000 if sys.platform.startswith('java') else 5000
+        kwargs |= self.default_client_options
         client = pymongo.MongoClient(
             host, port, serverSelectionTimeoutMS=timeout_ms, **kwargs)
         try:
@@ -350,10 +346,8 @@ class ClientContext(object):
                     self.auth_enabled = self._server_started_with_auth()
 
             if self.auth_enabled:
-                if not self.serverless:
-                    # See if db_user already exists.
-                    if not self._check_user_provided():
-                        _create_user(self.client.admin, db_user, db_pwd)
+                if not self.serverless and not self._check_user_provided():
+                    _create_user(self.client.admin, db_user, db_pwd)
 
                 self.client = self._connect(
                     host, port, username=db_user, password=db_pwd,
@@ -404,7 +398,7 @@ class ClientContext(object):
                               for node in hello.get('arbiters', [])])
                 self.nodes = set(nodes)
             else:
-                self.nodes = set([(host, port)])
+                self.nodes = {(host, port)}
             self.w = len(hello.get("hosts", [])) or 1
             self.version = Version.from_client(self.client)
 
@@ -437,9 +431,9 @@ class ClientContext(object):
                 if not self.serverless:
                     # Check for another mongos on the next port.
                     next_address = address[0], address[1] + 1
-                    mongos_client = self._connect(
-                        *next_address, **self.default_client_options)
-                    if mongos_client:
+                    if mongos_client := self._connect(
+                        *next_address, **self.default_client_options
+                    ):
                         hello = mongos_client.admin.command(HelloCompat.LEGACY_CMD)
                         if hello.get('msg') == 'isdbgrid':
                             self.mongoses.append(next_address)
@@ -472,9 +466,7 @@ class ClientContext(object):
 
     @property
     def has_secondaries(self):
-        if not self.client:
-            return False
-        return bool(len(self.client.secondaries))
+        return bool(len(self.client.secondaries)) if self.client else False
 
     @property
     def storage_engine(self):
@@ -528,9 +520,8 @@ class ClientContext(object):
         if 'parsed' in self.cmd_line:
             if not self.cmd_line['parsed'].get('net', {}).get('ipv6'):
                 return False
-        else:
-            if '--ipv6' not in self.cmd_line['argv']:
-                return False
+        elif '--ipv6' not in self.cmd_line['argv']:
+            return False
 
         # The server was started with --ipv6. Is there an IPv6 route to it?
         try:
@@ -549,11 +540,11 @@ class ClientContext(object):
                 self.init()
                 # Always raise SkipTest if we can't connect to MongoDB
                 if not self.connected:
-                    raise SkipTest(
-                        "Cannot connect to MongoDB on %s" % (self.pair,))
+                    raise SkipTest(f"Cannot connect to MongoDB on {self.pair}")
                 if condition():
                     return f(*args, **kwargs)
                 raise SkipTest(msg)
+
             return wrap
 
         if func is None:
@@ -573,25 +564,23 @@ class ClientContext(object):
     def require_connection(self, func):
         """Run a test only if we can connect to MongoDB."""
         return self._require(
-            lambda: True,  # _require checks if we're connected
-            "Cannot connect to MongoDB on %s" % (self.pair,),
-            func=func)
+            lambda: True, f"Cannot connect to MongoDB on {self.pair}", func=func
+        )
 
     def require_data_lake(self, func):
         """Run a test only if we are connected to Atlas Data Lake."""
         return self._require(
             lambda: self.is_data_lake,
-            "Not connected to Atlas Data Lake on %s" % (self.pair,),
-            func=func)
+            f"Not connected to Atlas Data Lake on {self.pair}",
+            func=func,
+        )
 
     def require_no_mmap(self, func):
         """Run a test only if the server is not using the MMAPv1 storage
         engine. Only works for standalone and replica sets; tests are
         run regardless of storage engine on sharded clusters. """
         def is_not_mmap():
-            if self.is_mongos:
-                return True
-            return self.storage_engine != 'mmapv1'
+            return True if self.is_mongos else self.storage_engine != 'mmapv1'
 
         return self._require(
             is_not_mmap, "Storage engine must not be MMAPv1", func=func)
@@ -599,16 +588,18 @@ class ClientContext(object):
     def require_version_min(self, *ver):
         """Run a test only if the server version is at least ``version``."""
         other_version = Version(*ver)
-        return self._require(lambda: self.version >= other_version,
-                             "Server version must be at least %s"
-                             % str(other_version))
+        return self._require(
+            lambda: self.version >= other_version,
+            f"Server version must be at least {str(other_version)}",
+        )
 
     def require_version_max(self, *ver):
         """Run a test only if the server version is at most ``version``."""
         other_version = Version(*ver)
-        return self._require(lambda: self.version <= other_version,
-                             "Server version must be at most %s"
-                             % str(other_version))
+        return self._require(
+            lambda: self.version <= other_version,
+            f"Server version must be at most {str(other_version)}",
+        )
 
     def require_auth(self, func):
         """Run a test only if the server is running with auth enabled."""
@@ -633,7 +624,8 @@ class ClientContext(object):
         `count` secondaries.
         """
         def sec_count():
-            return 0 if not self.client else len(self.client.secondaries)
+            return len(self.client.secondaries) if self.client else 0
+
         return self._require(lambda: sec_count() >= count,
                              "Not enough secondaries available")
 
@@ -713,15 +705,17 @@ class ClientContext(object):
                              func=func)
 
     def is_topology_type(self, topologies):
-        unknown = set(topologies) - {'single', 'replicaset', 'sharded',
-                                     'sharded-replicaset', 'load-balanced'}
-        if unknown:
+        if unknown := set(topologies) - {
+            'single',
+            'replicaset',
+            'sharded',
+            'sharded-replicaset',
+            'load-balanced',
+        }:
             raise AssertionError('Unknown topologies: %r' % (unknown,))
         if self.load_balancer:
-            if 'load-balanced' in topologies:
-                return True
-            return False
-        if 'single' in topologies and not (self.is_mongos or self.is_rs):
+            return 'load-balanced' in topologies
+        if 'single' in topologies and not self.is_mongos and not self.is_rs:
             return True
         if 'replicaset' in topologies and self.is_rs:
             return True
@@ -734,7 +728,7 @@ class ClientContext(object):
                 # will be 'replicaName/ip1:port1,ip2:port2,ip3:port3'
                 # Otherwise it will be 'ip1:port1'
                 host_spec = shard['host']
-                if not len(host_spec.split('/')) > 1:
+                if len(host_spec.split('/')) <= 1:
                     return False
             return True
         return False
@@ -745,9 +739,8 @@ class ClientContext(object):
         are 'single', 'replicaset', and 'sharded'."""
         def _is_valid_topology():
             return self.is_topology_type(topologies)
-        return self._require(
-            _is_valid_topology,
-            "Cluster type not in %s" % (topologies))
+
+        return self._require(_is_valid_topology, f"Cluster type not in {topologies}")
 
     def require_test_commands(self, func):
         """Run a test only if the server has test commands enabled."""
@@ -814,9 +807,7 @@ class ClientContext(object):
     def supports_retryable_writes(self):
         if self.storage_engine == 'mmapv1':
             return False
-        if not self.sessions_enabled:
-            return False
-        return self.is_mongos or self.is_rs
+        return self.is_mongos or self.is_rs if self.sessions_enabled else False
 
     def require_retryable_writes(self, func):
         """Run a test only if the deployment supports retryable writes."""
@@ -831,10 +822,7 @@ class ClientContext(object):
         if self.version.at_least(4, 1, 8):
             return self.is_mongos or self.is_rs
 
-        if self.version.at_least(4, 0):
-            return self.is_rs
-
-        return False
+        return self.is_rs if self.version.at_least(4, 0) else False
 
     def require_transactions(self, func):
         """Run a test only if the deployment might support transactions.
@@ -1014,10 +1002,11 @@ def _get_executors(topology):
 
 
 def all_executors_stopped(topology):
-    running = [e for e in _get_executors(topology) if not e._stopped]
-    if running:
-        print('  Topology %s has THREADS RUNNING: %s, created at: %s' % (
-            topology, running, topology._settings._stack))
+    if running := [e for e in _get_executors(topology) if not e._stopped]:
+        print(
+            f'  Topology {topology} has THREADS RUNNING: {running}, created at: {topology._settings._stack}'
+        )
+
         return False
     return True
 
@@ -1043,13 +1032,17 @@ def print_unclosed_clients():
 def teardown():
     garbage = []
     for g in gc.garbage:
-        garbage.append('GARBAGE: %r' % (g,))
-        garbage.append('  gc.get_referents: %r' % (gc.get_referents(g),))
-        garbage.append('  gc.get_referrers: %r' % (gc.get_referrers(g),))
+        garbage.extend(
+            (
+                'GARBAGE: %r' % (g,),
+                '  gc.get_referents: %r' % (gc.get_referents(g),),
+                '  gc.get_referrers: %r' % (gc.get_referrers(g),),
+            )
+        )
+
     if garbage:
         assert False, '\n'.join(garbage)
-    c = client_context.client
-    if c:
+    if c := client_context.client:
         if not client_context.is_data_lake:
             c.drop_database("pymongo-pooling-tests")
             c.drop_database("pymongo_test")
@@ -1089,8 +1082,7 @@ def test_cases(suite):
             yield suite_or_case
         else:
             # unittest.TestSuite
-            for case in test_cases(suite_or_case):
-                yield case
+            yield from test_cases(suite_or_case)
 
 
 # Helper method to workaround https://bugs.python.org/issue21724

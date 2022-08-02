@@ -14,13 +14,14 @@
 
 """Authentication Tests."""
 
+
 import os
 import sys
 import threading
 
 from urllib.parse import quote_plus
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 from pymongo import MongoClient, monitoring
 from pymongo.auth import HAVE_KERBEROS, _build_credentials_tuple
@@ -86,11 +87,10 @@ class TestGSSAPI(unittest.TestCase):
         cls.service_realm_required = (
             GSSAPI_SERVICE_REALM is not None and
             GSSAPI_SERVICE_REALM not in GSSAPI_PRINCIPAL)
-        mech_properties = 'SERVICE_NAME:%s' % (GSSAPI_SERVICE_NAME,)
-        mech_properties += (
-            ',CANONICALIZE_HOST_NAME:%s' % (GSSAPI_CANONICALIZE,))
+        mech_properties = f'SERVICE_NAME:{GSSAPI_SERVICE_NAME}'
+        mech_properties += f',CANONICALIZE_HOST_NAME:{GSSAPI_CANONICALIZE}'
         if GSSAPI_SERVICE_REALM is not None:
-            mech_properties += ',SERVICE_REALM:%s' % (GSSAPI_SERVICE_REALM,)
+            mech_properties += f',SERVICE_REALM:{GSSAPI_SERVICE_REALM}'
         cls.mech_properties = mech_properties
 
     def test_credentials_hashing(self):
@@ -110,8 +110,8 @@ class TestGSSAPI(unittest.TestCase):
             'GSSAPI', None, 'user', 'pass',
             {'authmechanismproperties': {'SERVICE_NAME': 'B'}}, None)
 
-        self.assertEqual(1, len(set([creds1, creds2])))
-        self.assertEqual(3, len(set([creds0, creds1, creds2, creds3])))
+        self.assertEqual(1, len({creds1, creds2}))
+        self.assertEqual(3, len({creds0, creds1, creds2, creds3}))
 
     @ignore_deprecations
     def test_gssapi_simple(self):
@@ -152,12 +152,11 @@ class TestGSSAPI(unittest.TestCase):
         client[GSSAPI_DB].collection.find_one()
 
         # Log in using URI, with authMechanismProperties.
-        mech_uri = uri + '&authMechanismProperties=%s' % (self.mech_properties,)
+        mech_uri = uri + f'&authMechanismProperties={self.mech_properties}'
         client = MongoClient(mech_uri)
         client[GSSAPI_DB].collection.find_one()
 
-        set_name = client.admin.command(HelloCompat.LEGACY_CMD).get('setName')
-        if set_name:
+        if set_name := client.admin.command(HelloCompat.LEGACY_CMD).get('setName'):
             if not self.service_realm_required:
                 # Without authMechanismProperties
                 client = MongoClient(GSSAPI_HOST,
@@ -169,7 +168,7 @@ class TestGSSAPI(unittest.TestCase):
 
                 client[GSSAPI_DB].list_collection_names()
 
-                uri = uri + '&replicaSet=%s' % (str(set_name),)
+                uri = uri + f'&replicaSet={str(set_name)}'
                 client = MongoClient(uri)
                 client[GSSAPI_DB].list_collection_names()
 
@@ -184,7 +183,7 @@ class TestGSSAPI(unittest.TestCase):
 
             client[GSSAPI_DB].list_collection_names()
 
-            mech_uri = mech_uri + '&replicaSet=%s' % (str(set_name),)
+            mech_uri = mech_uri + f'&replicaSet={str(set_name)}'
             client = MongoClient(mech_uri)
             client[GSSAPI_DB].list_collection_names()
 
@@ -213,17 +212,14 @@ class TestGSSAPI(unittest.TestCase):
             except OperationFailure:
                 raise SkipTest("User must be able to write.")
 
-        threads = []
-        for _ in range(4):
-            threads.append(AutoAuthenticateThread(collection))
+        threads = [AutoAuthenticateThread(collection) for _ in range(4)]
         for thread in threads:
             thread.start()
         for thread in threads:
             thread.join()
             self.assertTrue(thread.success)
 
-        set_name = client.admin.command(HelloCompat.LEGACY_CMD).get('setName')
-        if set_name:
+        if set_name := client.admin.command(HelloCompat.LEGACY_CMD).get('setName'):
             client = MongoClient(GSSAPI_HOST,
                                  GSSAPI_PORT,
                                  username=GSSAPI_PRINCIPAL,
@@ -235,9 +231,7 @@ class TestGSSAPI(unittest.TestCase):
             # Succeeded?
             client.server_info()
 
-            threads = []
-            for _ in range(4):
-                threads.append(AutoAuthenticateThread(collection))
+            threads = [AutoAuthenticateThread(collection) for _ in range(4)]
             for thread in threads:
                 thread.start()
             for thread in threads:
@@ -270,8 +264,7 @@ class TestSASLPlain(unittest.TestCase):
         client = MongoClient(uri)
         client.ldap.test.find_one()
 
-        set_name = client.admin.command(HelloCompat.LEGACY_CMD).get('setName')
-        if set_name:
+        if set_name := client.admin.command(HelloCompat.LEGACY_CMD).get('setName'):
             client = MongoClient(SASL_HOST,
                                  SASL_PORT,
                                  replicaSet=set_name,
@@ -557,9 +550,7 @@ class TestSCRAM(IntegrationTest):
 
         # The first thread to call find() will authenticate
         coll = rs_or_single_client().db.test
-        threads = []
-        for _ in range(4):
-            threads.append(AutoAuthenticateThread(coll))
+        threads = [AutoAuthenticateThread(coll) for _ in range(4)]
         for thread in threads:
             thread.start()
         for thread in threads:

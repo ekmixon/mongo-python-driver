@@ -16,6 +16,7 @@
 
 """Test the bson module."""
 
+
 import array
 import collections
 import datetime
@@ -30,7 +31,7 @@ import pickle
 from collections import abc, OrderedDict
 from io import BytesIO
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 import bson
 from bson import (BSON,
@@ -65,10 +66,7 @@ class NotADict(abc.MutableMapping):
     """Non-dict type that implements the mapping protocol."""
 
     def __init__(self, initial=None):
-        if not initial:
-            self._dict = {}
-        else:
-            self._dict = initial
+        self._dict = initial or {}
 
     def __iter__(self):
         return iter(self._dict)
@@ -91,7 +89,7 @@ class NotADict(abc.MutableMapping):
         return NotImplemented
 
     def __repr__(self):
-        return "NotADict(%s)" % repr(self._dict)
+        return f"NotADict({repr(self._dict)})"
 
 
 class DSTAwareTimezone(datetime.tzinfo):
@@ -355,7 +353,7 @@ class TestBSON(unittest.TestCase):
              b"\x05\x00\x00\x00\xFF"),
         ]
         for i, data in enumerate(bad_bsons):
-            msg = "bad_bson[{}]".format(i)
+            msg = f"bad_bson[{i}]"
             with self.assertRaises(InvalidBSON, msg=msg):
                 decode_all(data)
             with self.assertRaises(InvalidBSON, msg=msg):
@@ -921,7 +919,7 @@ class TestBSON(unittest.TestCase):
 
         def target(i):
             for j in range(1000):
-                my_int = type('MyInt_%s_%s' % (i, j), (int,), {})
+                my_int = type(f'MyInt_{i}_{j}', (int,), {})
                 bson.encode({'my_int': my_int()})
 
         threads = [ExceptionCatchingThread(target=target, args=(i,))
@@ -936,6 +934,7 @@ class TestBSON(unittest.TestCase):
             self.assertIsNone(t.exc)
 
     def test_raise_invalid_document(self):
+
         class Wrapper(object):
             def __init__(self, val):
                 self.val = val
@@ -944,9 +943,7 @@ class TestBSON(unittest.TestCase):
                 return repr(self.val)
 
         self.assertEqual('1', repr(Wrapper(1)))
-        with self.assertRaisesRegex(
-                InvalidDocument,
-                "cannot encode object: 1, of type: " + repr(Wrapper)):
+        with self.assertRaisesRegex(InvalidDocument, f"cannot encode object: 1, of type: {repr(Wrapper)}"):
             encode({'t': Wrapper(1)})
 
 

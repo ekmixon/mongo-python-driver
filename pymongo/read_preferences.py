@@ -63,8 +63,7 @@ def _validate_tag_sets(tag_sets):
 
 
 def _invalid_max_staleness_msg(max_staleness):
-    return ("maxStalenessSeconds must be a positive integer, not %s" %
-            max_staleness)
+    return f"maxStalenessSeconds must be a positive integer, not {max_staleness}"
 
 
 # Some duplication with common.py to avoid import cycle.
@@ -376,12 +375,10 @@ class SecondaryPreferred(_ServerMode):
 
     def __call__(self, selection):
         """Apply this read preference to Selection."""
-        secondaries = secondary_with_tags_server_selector(
+        if secondaries := secondary_with_tags_server_selector(
             self.tag_sets,
-            max_staleness_selectors.select(
-                self.max_staleness, selection))
-
-        if secondaries:
+            max_staleness_selectors.select(self.max_staleness, selection),
+        ):
             return secondaries
         else:
             return selection.primary_selection

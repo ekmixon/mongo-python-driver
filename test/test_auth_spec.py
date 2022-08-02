@@ -14,12 +14,13 @@
 
 """Run the auth spec tests."""
 
+
 import glob
 import json
 import os
 import sys
 
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 from pymongo import MongoClient
 from test import unittest
@@ -77,7 +78,7 @@ def create_test(test_case):
                                 actual.aws_session_token,
                                 expected['AWS_SESSION_TOKEN'])
                         else:
-                            self.fail('Unhandled property: %s' % (key,))
+                            self.fail(f'Unhandled property: {key}')
                 else:
                     if credential['mechanism'] == 'MONGODB-AWS':
                         self.assertIsNone(
@@ -98,10 +99,7 @@ def create_tests():
                     continue
                 test_method = create_test(test_case)
                 name = str(test_case['description'].lower().replace(' ', '_'))
-                setattr(
-                    TestAuthSpec,
-                    'test_%s_%s' % (test_suffix, name),
-                    test_method)
+                setattr(TestAuthSpec, f'test_{test_suffix}_{name}', test_method)
 
 
 create_tests()

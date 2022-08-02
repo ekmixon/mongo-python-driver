@@ -314,8 +314,12 @@ class Cursor(object):
                            "query_flags", "collation", "empty",
                            "show_record_id", "return_key", "allow_disk_use",
                            "snapshot", "exhaust")
-        data = dict((k, v) for k, v in self.__dict__.items()
-                    if k.startswith('_Cursor__') and k[9:] in values_to_clone)
+        data = {
+            k: v
+            for k, v in self.__dict__.items()
+            if k.startswith('_Cursor__') and k[9:] in values_to_clone
+        }
+
         if deepcopy:
             data = self._deepcopy(data)
         base.__dict__.update(data)
@@ -338,8 +342,7 @@ class Cursor(object):
         self.__killed = True
         if self.__id and not already_killed:
             cursor_id = self.__id
-            address = _CursorAddress(
-                self.__address, "%s.%s" % (self.__dbname, self.__collname))
+            address = _CursorAddress(self.__address, f"{self.__dbname}.{self.__collname}")
         else:
             # Skip killCursors.
             cursor_id = 0
@@ -993,10 +996,9 @@ class Cursor(object):
             raise
 
         self.__address = response.address
-        if isinstance(response, PinnedResponse):
-            if not self.__sock_mgr:
-                self.__sock_mgr = _SocketManager(response.socket_info,
-                                                 response.more_to_come)
+        if isinstance(response, PinnedResponse) and not self.__sock_mgr:
+            self.__sock_mgr = _SocketManager(response.socket_info,
+                                             response.more_to_come)
 
         cmd_name = operation.name
         docs = response.docs
@@ -1006,9 +1008,7 @@ class Cursor(object):
                 self.__id = cursor['id']
                 if cmd_name == 'find':
                     documents = cursor['firstBatch']
-                    # Update the namespace used for future getMore commands.
-                    ns = cursor.get('ns')
-                    if ns:
+                    if ns := cursor.get('ns'):
                         self.__dbname, self.__collname = ns.split('.', 1)
                 else:
                     documents = cursor['nextBatch']
@@ -1189,10 +1189,11 @@ class Cursor(object):
         Regular expressions cannot be deep copied but as they are immutable we
         don't have to copy them when cloning.
         """
-        if not hasattr(x, 'items'):
-            y, is_list, iterator = [], True, enumerate(x)
-        else:
-            y, is_list, iterator = {}, False, x.items()
+        y, is_list, iterator = (
+            ({}, False, x.items())
+            if hasattr(x, 'items')
+            else ([], True, enumerate(x))
+        )
 
         if memo is None:
             memo = {}

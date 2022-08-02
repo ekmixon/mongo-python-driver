@@ -16,8 +16,9 @@
 
 """Tests for the Code wrapper."""
 
+
 import sys
-sys.path[0:0] = [""]
+sys.path[:0] = [""]
 
 from bson.code import Code
 from test import unittest

@@ -29,9 +29,7 @@ from pymongo.errors import ConfigurationError
 # dnspython can return bytes or str from various parts
 # of its API depending on version. We always want str.
 def maybe_decode(text):
-    if isinstance(text, bytes):
-        return text.decode()
-    return text
+    return text.decode() if isinstance(text, bytes) else text
 
 
 # PYTHON-2667 Lazily call dns.resolver methods for compatibility with eventlet.
@@ -85,8 +83,12 @@ class _SrvResolver(object):
 
     def _resolve_uri(self, encapsulate_errors):
         try:
-            results = _resolve('_' + self.__srv + '._tcp.' + self.__fqdn,
-                               'SRV', lifetime=self.__connect_timeout)
+            results = _resolve(
+                f'_{self.__srv}._tcp.{self.__fqdn}',
+                'SRV',
+                lifetime=self.__connect_timeout,
+            )
+
         except Exception as exc:
             if not encapsulate_errors:
                 # Raise the original error.
@@ -108,9 +110,9 @@ class _SrvResolver(object):
             try:
                 nlist = node[0].split(".")[1:][-self.__slen:]
             except Exception:
-                raise ConfigurationError("Invalid SRV host: %s" % (node[0],))
+                raise ConfigurationError(f"Invalid SRV host: {node[0]}")
             if self.__plist != nlist:
-                raise ConfigurationError("Invalid SRV host: %s" % (node[0],))
+                raise ConfigurationError(f"Invalid SRV host: {node[0]}")
         if self.__srv_max_hosts:
             nodes = random.sample(nodes, min(self.__srv_max_hosts, len(nodes)))
         return results, nodes

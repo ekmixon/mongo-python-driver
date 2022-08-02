@@ -42,14 +42,14 @@ class MockPool(Pool):
     @contextlib.contextmanager
     def get_socket(self, all_credentials, handler=None):
         client = self.client
-        host_and_port = '%s:%s' % (self.mock_host, self.mock_port)
+        host_and_port = f'{self.mock_host}:{self.mock_port}'
         if host_and_port in client.mock_down_hosts:
             raise AutoReconnect('mock error')
 
         assert host_and_port in (
-            client.mock_standalones
-            + client.mock_members
-            + client.mock_mongoses), "bad host: %s" % host_and_port
+            client.mock_standalones + client.mock_members + client.mock_mongoses
+        ), f"bad host: {host_and_port}"
+
 
         with Pool.get_socket(self, all_credentials, handler) as sock_info:
             sock_info.mock_host = self.mock_host
@@ -117,19 +117,11 @@ class MockClient(MongoClient):
         self.mock_standalones = standalones[:]
         self.mock_members = members[:]
 
-        if self.mock_members:
-            self.mock_primary = self.mock_members[0]
-        else:
-            self.mock_primary = None
-
+        self.mock_primary = self.mock_members[0] if self.mock_members else None
         # Hosts that should be considered an arbiter.
         self.mock_arbiters = arbiters[:] if arbiters else []
 
-        if hello_hosts is not None:
-            self.mock_hello_hosts = hello_hosts
-        else:
-            self.mock_hello_hosts = members[:]
-
+        self.mock_hello_hosts = hello_hosts if hello_hosts is not None else members[:]
         self.mock_mongoses = mongoses[:]
 
         # Hosts that should raise socket errors.
@@ -221,7 +213,7 @@ class MockClient(MongoClient):
         else:
             # In test_internal_ips(), we try to connect to a host listed
             # in hello['hosts'] but not publicly accessible.
-            raise AutoReconnect('Unknown host: %s' % host)
+            raise AutoReconnect(f'Unknown host: {host}')
 
         return response, rtt
 
